@@ -1,6 +1,6 @@
-# Ostmalas dinastija — Android
+# Lielais Ābols — Android
 
-Dzīves simulators piejūras pilsētā (Miami Nights stilā). Spēle ir HTML/JS, kas iepakota Android lietotnē (WebView).
+Dzīves simulators Manhetenā (New York Nights stilā). Spēle ir HTML/JS, kas iepakota Android lietotnē (WebView).
 
 - Spēles faili: `app/src/main/assets/www/`
 - Android kods: `app/src/main/java/lv/ostmala/dinastija/MainActivity.java`

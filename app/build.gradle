@@ -11,7 +11,7 @@ android {
     compileSdk 36
 
     defaultConfig {
-        applicationId 'lv.ostmala.dinastija'
+        applicationId 'lv.lielaisabols.spele'
         minSdk 26
         targetSdk 36
         versionCode runNumber

@@ -1,58 +1,66 @@
-/* ===================== Spēles loģika: kustība, NPC, mijiedarbība ===================== */
-const P={x:12.5,y:24.5,path:[],target:null,ph:0,dir:0,exitB:null,lastTile:null};
-let NPCS=[],CARS=[],ROOM=null,COMP_NPC=null;const TARGET={x:0,y:0,t:0};
+/* ===================== Spēles loģika ===================== */
+const P={x:6.5,y:41.5,path:[],target:null,ph:0,dir:0};
+let NPCS=[],CARS=[],ROOM=null,COMP_NPC=null,EXTRAS=[];const TARGET={x:0,y:0,t:0};
 const curMap=()=>S.where?ROOM:CITY;
+const RES=['apt','apt5','apt_ct','apt_loft','apt_pent','apt_home'];
 
 /* ---------- Mašīnas ---------- */
-function initCars(){CARS=[];const lanes=[];ROADS.forEach(r=>{lanes.push({ax:'x',c:r+.5,d:1},{ax:'x',c:r+1.5,d:-1},{ax:'y',c:r+.5,d:-1},{ax:'y',c:r+1.5,d:1})});
-  const cols=['#e2484f','#f4f4f4','#2b2f3a','#3f7fd8','#46b06b','#9aa3ad','#ff7a59','#1f6f8b','#c0c4ca','#ffb3cf','#9b5bd6'];
-  for(let i=0;i<26;i++){const ln=lanes[i%lanes.length],s=rnd()*58;CARS.push({ax:ln.ax,dir:ln.d,lane:ln.c,s,v:2+rnd()*1.8,col:i%7===0?'#ffd23f':cols[i%cols.length],taxi:i%7===0,x:0,y:0})}}
-function updCars(dt){CARS.forEach(c=>{c.s+=c.v*dt*c.dir;if(c.s>58.6)c.s=-.6;if(c.s<-.6)c.s=58.6;if(c.ax==='x'){c.x=c.s;c.y=c.lane}else{c.x=c.lane;c.y=c.s}})}
+function initCars(){CARS=[];const lanes=[];
+  ROADS.forEach(r=>{const seg=ax=>{let best=[0,0],s=null;for(let i=0;i<=59;i++){const ok=i<59&&(ax==='x'?grid[gi(i,r)]===T.ROAD:grid[gi(r,i)]===T.ROAD);if(ok&&s===null)s=i;if(!ok&&s!==null){if(i-s>best[1]-best[0])best=[s,i];s=null}}return best};
+    const sx=seg('x'),sy=seg('y');lanes.push({ax:'x',c:r+.5,d:1,s0:sx[0],s1:sx[1]},{ax:'x',c:r+1.5,d:-1,s0:sx[0],s1:sx[1]},{ax:'y',c:r+.5,d:-1,s0:sy[0],s1:sy[1]},{ax:'y',c:r+1.5,d:1,s0:sy[0],s1:sy[1]})});
+  const cols=['#e2484f','#f4f4f4','#2b2f3a','#3f7fd8','#46b06b','#9aa3ad','#1f6f8b','#c0c4ca','#7a2b2b'];
+  for(let i=0;i<34;i++){const ln=lanes[i%lanes.length];const taxi=rnd()<.45;CARS.push({ax:ln.ax,dir:ln.d,lane:ln.c,s0:ln.s0,s1:ln.s1,s:ln.s0+rnd()*(ln.s1-ln.s0),v:2+rnd()*1.8,col:taxi?'#ffc61a':pick(cols),taxi,x:0,y:0})}}
+function updCars(dt){CARS.forEach(c=>{c.s+=c.v*dt*c.dir;if(c.s>c.s1-.4)c.s=c.s0+.2;if(c.s<c.s0+.2)c.s=c.s1-.4;if(c.ax==='x'){c.x=c.s;c.y=c.lane}else{c.x=c.lane;c.y=c.s}})}
 
-/* ---------- NPC ---------- */
-function npcInfo(n){if(n.staff)return {look:n.look,sex:n.sex,person:null,name:n.name};const p=pById(n.pid);if(!p)return {look:randLook('m'),sex:'m',person:null,name:'?'};
-  return {look:p.look,sex:p.sex,person:p,name:p.rel==='none'?'Svešinieks':fullName(p),scale:ageOf(p.bT)<14?.72:ageOf(p.bT)<18?.88:1}}
-function mkNpc(p,x,y){return {pid:p.id,x,y,path:[],wait:R(0,3),spd:1.25+rnd()*.55,ph:rnd()*6,dir:R(0,3)}}
-function randStreetTile(near){for(let i=0;i<300;i++){let x,y;if(near&&i<200){x=Math.floor(P.x)+R(-14,14);y=Math.floor(P.y)+R(-14,14)}else{x=R(0,58);y=R(0,58)}
-  if(walkCity(x,y)&&grid[gi(x,y)]!==T.ROAD&&grid[gi(x,y)]!==T.PIER)return [x+.5,y+.5]}return [12.5,24.5]}
-function streetPeople(){const h=hourNow();return S.people.filter(p=>p.alive&&p.id!==S.comp&&locOf(p,h)==='street'&&(p.town||p.rel!=='none'))}
+/* ---------- Cilvēki ---------- */
+const ZONE_TILES={};
+(function(){for(let y=0;y<59;y++)for(let x=0;x<61;x++){const t=grid[gi(x,y)];if(!walkCity(x,y)||t===T.ROAD||t===T.PIER)continue;if(BLDS.some(b=>b.door[0]===x&&b.door[1]===y))continue;const d=distAt(x,y);(ZONE_TILES[d]=ZONE_TILES[d]||[]).push([x,y])}})();
+function npcInfo(n){if(n.extra)return {look:n.look,sex:n.sex,person:null};const p=pById(n.pid);if(!p)return {look:randLook('m'),sex:'m',person:null};
+  const L=p.cast?p.look:p.look;return {look:L,sex:p.sex,person:p,scale:p.key==='kevin'?.92:1}}
+function mkNpc(p,x,y){return {pid:p.id,x,y,path:[],wait:R(0,3),spd:1.2+rnd()*.5,ph:rnd()*6,dir:R(0,3)}}
+function zoneTile(z,near){const L=ZONE_TILES[z]||ZONE_TILES.gv;if(near){const cand=L.filter(([x,y])=>Math.abs(x-P.x)+Math.abs(y-P.y)<22);if(cand.length&&rnd()<.75)return pick(cand)}return pick(L)}
+function streetPeople(){const h=hourNow();return S.people.filter(p=>p.id!==S.comp&&locOf(p,h)==='street')}
+function placeStreet(p){if(p.spot)return [p.spot[0]+.5,p.spot[1]+.5];const t=zoneTile(p.zone,true);return [t[0]+.5,t[1]+.5]}
 function spawnCity(){
-  NPCS=[];const list=streetPeople().sort(()=>rnd()-.5).slice(0,28);
-  list.forEach((p,i)=>{const [x,y]=randStreetTile(i<18);NPCS.push(mkNpc(p,x,y))});
+  NPCS=[];streetPeople().forEach(p=>{const [x,y]=placeStreet(p);NPCS.push(mkNpc(p,x,y))});
   if(S.comp){const p=pById(S.comp);if(p){const t=adjFree(CITY,Math.floor(P.x),Math.floor(P.y))||[Math.floor(P.x),Math.floor(P.y)];COMP_NPC=mkNpc(p,t[0]+.5,t[1]+.5);NPCS.push(COMP_NPC)}}
+  spawnExtras();
 }
+function spawnExtras(){EXTRAS=[];const n=distAt(Math.floor(P.x),Math.floor(P.y))==='ts'?26:18;
+  for(let i=0;i<n;i++){const z=distAt(Math.floor(P.x),Math.floor(P.y));const t=zoneTile(rnd()<.8?z:pick(Object.keys(DISTS)),true);const sex=rnd()<.5?'m':'f';EXTRAS.push({extra:1,look:randLook(sex),sex,x:t[0]+.5,y:t[1]+.5,path:[],wait:rnd()*3,spd:1.3+rnd()*.6,ph:rnd()*6,dir:R(0,3)})}}
 function refreshCityNPCs(){
-  const h=hourNow(),keep=NPCS.filter(n=>{const p=pById(n.pid);return n===COMP_NPC||n.talking||(p&&p.alive&&locOf(p,h)==='street')});
+  const h=hourNow(),keep=NPCS.filter(n=>{const p=pById(n.pid);return n===COMP_NPC||n.talking||(p&&locOf(p,h)==='street')});
   const ids=new Set(keep.map(n=>n.pid));NPCS=keep;
-  const add=streetPeople().filter(p=>!ids.has(p.id)).sort(()=>rnd()-.5).slice(0,Math.max(0,28-NPCS.length));
-  add.forEach(p=>{const b=pick(BLDS),t=b.door;NPCS.push(mkNpc(p,t[0]+.5,t[1]+.5))});
+  streetPeople().filter(p=>!ids.has(p.id)).forEach(p=>{const b=BLDS.find(x=>x.id===p.sched.find(s=>s.h<=h)?.l)||null;const pos=b?[b.door[0]+.5,b.door[1]+.5]:placeStreet(p);NPCS.push(mkNpc(p,pos[0],pos[1]))});
 }
-function roomPeople(b){const h=hourNow();return S.people.filter(p=>p.alive&&p.id!==S.comp&&(locOf(p,h)===b.id||(S.where&&S.where.owner===p.id)||(S.where&&S.where.variant==='home'&&homeOf(p)===b.id&&p.rel!=='none'&&locOf(p,h)===b.id)))}
+function roomPeople(b){const h=hourNow();return S.people.filter(p=>p.id!==S.comp&&(locOf(p,h)===b.id||(S.where&&S.where.owner===p.id)||(S.where&&S.where.variant==='home'&&p.homeB===b.id&&locOf(p,h)===b.id)))}
 function spawnRoom(){
-  NPCS=[];const m=ROOM,b=bld(S.where.b);
-  // personāls
-  m.staffP=[];if(!m.home&&S.where.variant!=='flat'){m.staff.forEach((s,i)=>{const sex=hash(b.seed,i)<.5?'m':'f';const L=randLook(sex);L.top={t:'shirt',c:b.acc};L.bot={t:'pants',c:'#2b2f3a'};m.staffP.push({x:s.x,y:s.y,look:L,sex,o:s.o})})}
-  const list=roomPeople(b).slice(0,10);
-  list.forEach(p=>{const t=randRoomTile(m);if(t)NPCS.push(Object.assign(mkNpc(p,t[0]+.5,t[1]+.5),{spd:.8}))});
+  NPCS=[];EXTRAS=[];const m=ROOM,b=bld(S.where.b);
+  m.staffP=[];if(!m.home&&S.where.variant!=='flat'){m.staff.forEach((s,i)=>{const sex=hash(b.seed,i)<.5?'m':'f';const L=randLook(sex);L.top={t:'shirt',c:b.acc};L.bot={t:'pants',c:'#2b2f3a'};L.acc=null;m.staffP.push({x:s.x,y:s.y,look:L,sex,o:s.o})})}
+  roomPeople(b).slice(0,10).forEach(p=>{const t=randRoomTile(m);if(t)NPCS.push(Object.assign(mkNpc(p,t[0]+.5,t[1]+.5),{spd:.8}))});
   if(S.comp){const p=pById(S.comp);if(p){const t=adjFree(m,m.exit[0],m.exit[1])||m.exit;COMP_NPC=Object.assign(mkNpc(p,t[0]+.5,t[1]+.5),{spd:1.6});NPCS.push(COMP_NPC)}}
 }
 function randRoomTile(m){for(let i=0;i<80;i++){const x=R(0,m.W-1),y=R(0,m.H-2);if(m.walk(x,y)&&!(x===m.exit[0]&&y===m.exit[1]))return [x,y]}return null}
 function refreshRoomNPCs(){const b=bld(S.where.b),h=hourNow();
-  NPCS=NPCS.filter(n=>{if(n===COMP_NPC||n.talking)return true;const p=pById(n.pid);const ok=p&&p.alive&&(locOf(p,h)===b.id||S.where.owner===p.id);return ok});
+  NPCS=NPCS.filter(n=>{if(n===COMP_NPC||n.talking)return true;const p=pById(n.pid);return p&&(locOf(p,h)===b.id||S.where.owner===p.id)});
   const ids=new Set(NPCS.map(n=>n.pid));roomPeople(b).filter(p=>!ids.has(p.id)).slice(0,Math.max(0,10-NPCS.length)).forEach(p=>{NPCS.push(Object.assign(mkNpc(p,ROOM.exit[0]+.5,ROOM.exit[1]+.5),{spd:.8}))});
 }
-function onHour(){if(!S||!S.c)return;if(S.where)refreshRoomNPCs();else refreshCityNPCs();if(typeof renderHUD==='function')renderHUD()}
+function onHour(){if(!S||!S.c)return;if(S.where)refreshRoomNPCs();else refreshCityNPCs();if(typeof storyHour==='function')storyHour();if(typeof renderHUD==='function')renderHUD()}
 function adjFree(m,x,y){for(const [dx,dy] of [[0,-1],[-1,0],[1,0],[0,1],[-1,-1],[1,-1]]){if(m.walk(x+dx,y+dy))return [x+dx,y+dy]}return null}
+function wander(n,m,r,maxN){const tx=cl(Math.floor(n.x)+R(-r,r),0,m.W-1),ty=cl(Math.floor(n.y)+R(-r,r),0,m.H-1);
+  n.path=(m.walk(tx,ty)&&(S.where||grid[gi(tx,ty)]!==T.ROAD)&&bfs(m,Math.floor(n.x),Math.floor(n.y),tx,ty,maxN))||[]}
 function updNPCs(dt){
   const m=curMap();
   for(const n of NPCS){
-    if(n.talking){const dx=P.x-n.x,dy=P.y-n.y;n.dir=dirFrom(dx,dy);continue}
-    if(n===COMP_NPC){if(n.path.length){stepMover(n,dt,n.spd*(S.where?1:VEHSP()))}continue}
+    if(n.talking){n.dir=dirFrom(P.x-n.x,P.y-n.y);continue}
+    if(n===COMP_NPC){if(n.path.length)stepMover(n,dt,n.spd*(S.where?1:1.25));continue}
     if(n.hold)continue;
-    if(!n.path.length){n.wait-=dt;if(n.wait<=0){const r=S.where?3:7,tx=cl(Math.floor(n.x)+R(-r,r),0,m.W-1),ty=cl(Math.floor(n.y)+R(-r,r),0,m.H-1);
-      n.path=(m.walk(tx,ty)&&(S.where||grid[gi(tx,ty)]!==T.ROAD)&&bfs(m,Math.floor(n.x),Math.floor(n.y),tx,ty,S.where?200:900))||[];n.wait=1.5+rnd()*(S.where?6:4)}}
+    const p=pById(n.pid);
+    if(!n.path.length){n.wait-=dt;if(n.wait<=0){if(p&&p.spot&&!S.where){n.wait=4+rnd()*6;if(Math.abs(n.x-p.spot[0]-.5)+Math.abs(n.y-p.spot[1]-.5)>2)n.path=bfs(m,Math.floor(n.x),Math.floor(n.y),p.spot[0],p.spot[1],300)||[];else wander(n,m,1,40)}else{wander(n,m,S.where?3:7,S.where?200:900);n.wait=1.5+rnd()*(S.where?6:4)}}}
     else stepMover(n,dt,n.spd);
   }
+  if(!S.where)for(const n of EXTRAS){if(!n.path.length){n.wait-=dt;if(n.wait<=0){wander(n,m,8,700);n.wait=.5+rnd()*3}}else stepMover(n,dt,n.spd);
+    if(Math.abs(n.x-P.x)+Math.abs(n.y-P.y)>30){const t=zoneTile(distAt(Math.floor(P.x),Math.floor(P.y)),true);n.x=t[0]+.5;n.y=t[1]+.5;n.path=[]}}
 }
 function stepMover(m,dt,spd){
   if(!m.path.length)return false;
@@ -61,7 +69,6 @@ function stepMover(m,dt,spd){
   if(dist<=st){m.x=gx;m.y=gy;m.path.shift();return true}
   m.x+=dx/dist*st;m.y+=dy/dist*st;return false;
 }
-const VEHSP=()=>(VEH.find(v=>v.id===C().veh)||VEH[0]).sp;
 
 /* ---------- Spēlētāja kustība ---------- */
 function goTo(tx,ty,target){
@@ -92,31 +99,21 @@ function arrive(){
 }
 function playerStep(dt){
   if(!P.path.length)return;
-  const sp=S.where?2.6:3.2*VEHSP();
+  const sp=S.where?2.6:3.3;
   const prev=[Math.floor(P.x),Math.floor(P.y)];
   if(stepMover(P,dt,sp)){
-    advance(S.where?.4:1/VEHSP());
-    if(!S.where){checkGnome();checkPet()}
+    if(!S.where){const d=distAt(Math.floor(P.x),Math.floor(P.y));if(d!==S.lastDist){S.lastDist=d;tick(`📍 ${DISTS[d].n}`,'y');renderHUD();if(typeof storyHour==='function')storyHour()}}
     if(COMP_NPC){const [lx,ly]=prev,m=curMap();if(m.walk(lx,ly))COMP_NPC.path=[[lx,ly]]}
     const t=P.target;
     if(t&&t.type==='npc'&&Math.hypot(t.n.x-P.x,t.n.y-P.y)<1.6){P.path=[];arrive()}
     else if(!P.path.length)arrive();
-    if(Math.floor(S.min)%6===0)renderHUD();
   }
 }
-function checkGnome(){const fx=Math.floor(P.x),fy=Math.floor(P.y);
-  GNOME_SPOTS.forEach(([x,y],i)=>{if(x===fx&&y===fy&&!S.gnomes.includes(i)){S.gnomes.push(i);const c=C();c.money+=150;addStat('happy',3);
-    log(`Atrasts dārza rūķītis (${S.gnomes.length}/${GNOMES}) · +150 €`,'y');
-    if(S.gnomes.length===GNOMES){c.money+=5000;addRep(5);modal({t:'Pēdējais rūķītis!',b:`<p>Tu atradi visus ${GNOMES} Ostmalas dārza rūķīšus! +5000 €, +slava.</p>`,ch:[{l:'Lieliski'}]})}
-    checkTrophies();save();renderHUD()}})}
-function checkPet(){const fx=Math.floor(P.x),fy=Math.floor(P.y);S.quests.forEach(q=>{if(q.type==='pet'&&!q.found&&q.pet&&q.pet[0]===fx&&q.pet[1]===fy){q.found=true;C().inv.kakis=(C().inv.kakis||0)+1;toast('Tu noķēri kaķi Minci! Aiznes to saimniekam.');log('Kaķis Mince atrasts!','y')}})}
 
 /* ---------- Ievade ---------- */
-function screenToWorld(cx,cy){return {x:(cx*DPR-(CW/2-cam.x*K))/K+0,y:(cy*DPR-(CH/2-cam.y*K))/K}}
-function inPoly(pt,poly){let ins=false;for(let i=0,j=poly.length-1;i<poly.length;j=i++){const [xi,yi]=poly[i],[xj,yj]=poly[j];if(((yi>pt[1])!==(yj>pt[1]))&&(pt[0]<(xj-xi)*(pt[1]-yi)/(yj-yi)+xi))ins=!ins}return ins}
+function screenToWorld(cx,cy){return {x:(cx*DPR-(CW/2-cam.x*K))/K,y:(cy*DPR-(CH/2-cam.y*K))/K}}
 function onTap(cx,cy){
-  if(!S||!S.c||S.dead||$('#modalRoot').innerHTML||S.tab!=='city')return;
-  if(C().jail){toast('Tu esi cietumā. Spied „Gaidīt mēnesi”.');return}
+  if(!S||!S.c||S.over||$('#modalRoot').innerHTML||MG_ON||S.tab!=='city')return;
   const w=screenToWorld(cx,cy),pt=[w.x,w.y];
   for(let i=HITS.length-1;i>=0;i--){const h=HITS[i];const hit=h.rect?(pt[0]>=h.rect[0]&&pt[0]<=h.rect[0]+h.rect[2]&&pt[1]>=h.rect[1]&&pt[1]<=h.rect[1]+h.rect[3]):inPoly(pt,h.poly);if(!hit)continue;
     if(h.k==='npc'){const n=h.ref;goTo(Math.floor(n.x),Math.floor(n.y),{type:'npc',n});return}
@@ -135,26 +132,25 @@ cv.addEventListener('wheel',e=>{e.preventDefault();setZoom(ZOOM*(e.deltaY>0?.9:1
 cv.addEventListener('touchstart',e=>{if(e.touches.length===2){const [a,b]=e.touches;pinch={d:Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY),z:ZOOM}}},{passive:true});
 cv.addEventListener('touchmove',e=>{if(pinch&&e.touches.length===2){const [a,b]=e.touches;setZoom(pinch.z*Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY)/pinch.d)}},{passive:true});
 cv.addEventListener('touchend',()=>{pinch=null},{passive:true});
-function setZoom(z){ZOOM=cl(z,.55,2.2);K=DPR*ZOOM;tileCache={}}
+function setZoom(z){ZOOM=cl(z,.45,2.2);K=DPR*ZOOM;tileCache={}}
 const KEYS={ArrowUp:[0,-1],ArrowDown:[0,1],ArrowLeft:[-1,0],ArrowRight:[1,0],w:[0,-1],s:[0,1],a:[-1,0],d:[1,0]};let keyDir=null;
-document.addEventListener('keydown',e=>{if(!S||S.tab!=='city'||$('#modalRoot').innerHTML||e.target.tagName==='INPUT')return;if(KEYS[e.key]){keyDir=KEYS[e.key];e.preventDefault()}});
+document.addEventListener('keydown',e=>{if(!S||S.tab!=='city'||MG_ON||$('#modalRoot').innerHTML||e.target.tagName==='INPUT')return;if(KEYS[e.key]){keyDir=KEYS[e.key];e.preventDefault()}});
 document.addEventListener('keyup',e=>{if(KEYS[e.key])keyDir=null});
 
 /* ---------- Ēkas ---------- */
-function isOpen(b){const h=hourNow();if(b.type==='casino'&&!S.country.laws.includes('casino'))return false;return h>=b.hours[0]&&h<b.hours[1]}
-function residentsOf(b){return S.people.filter(p=>p.alive&&homeOf(p)===b.id&&p.rel!=='none')}
+function isOpen(b){const h=hourNow();return h>=b.hours[0]&&h<b.hours[1]}
 function enterBuilding(b){
-  const c=C();if(c.jail||S.dead)return;
-  const myHome=HOMES[c.home].b===b.id;
-  if(myHome){doEnter(b,'home');return}
-  if(b.type==='apt'||b.type==='parents'){
-    const res=residentsOf(b);const h=hourNow();
-    const ch=res.map(p=>({l:`Zvanīt pie durvīm: ${p.first}`,s:relName(p),fn:()=>{if(locOf(p,h)===b.id&&(p.close>=15||isFamily(p))){doEnter(b,'flat',p.id);toast(`${p.first} atver durvis.`)}else toast(locOf(p,h)===b.id?`${p.first} tevi neielaiž.`:'Neviens neatver durvis.')}}));
-    if(b.type==='apt')ch.push({l:'Ieiet kāpņu telpā',fn:()=>doEnter(b,'lobby')});
-    ch.push({l:'Atpakaļ',exit:true});modal({t:b.n,sub:'Dzīvojamā ēka',b:res.length?'':'<p class="muted">Tu nepazīsti nevienu, kas šeit dzīvo.</p>',ch});return}
-  if(b.type==='house'||b.type==='villa'){toast(`${b.n} ir pārdošanā. Jautā nekustamo īpašumu aģentūrā.`);return}
-  if(!isOpen(b)){toast(b.type==='casino'&&!S.country.laws.includes('casino')?'Kazino ir slēgts: tam vajag kazino legalizācijas likumu.':`${b.n} ir slēgts. Darba laiks ${hstr(b.hours[0])}–${hstr(b.hours[1])}.`);return}
-  if(b.type==='vip'){const st=styleScore();if(st<30||c.rep<20){modal({t:'Apsargs',b:`<p>„Tikai VIP viesiem.” Vajag stilu 30 un slavu 20. Tev: stils ${st}, slava ${Math.round(c.rep)}.</p>`,ch:[{l:'Iepirkt 200 € dzeramnaudu',s:'Varbūt viņš izliksies neredzam…',fn:()=>{if(c.money<200)return toast('Nepietiek naudas.');c.money-=200;if(rnd()<.5){doEnter(b);toast('Apsargs pamāj ar galvu.')}else toast('Apsargs paņem naudu un tik un tā neielaiž!')}},{l:'Atkāpties',exit:true}]});return}c.flags.vip=true;checkTrophies()}
+  const c=C();if(S.over)return;
+  if(HOMES[c.home].b===b.id){doEnter(b,'home');return}
+  if(RES.includes(b.type)){
+    const h=hourNow(),res=S.people.filter(p=>p.homeB===b.id&&p.met&&!(p.key==='lucy'&&S.flags.roommate&&b.id!=='home'));
+    const ch=res.map(p=>({l:`Zvanīt pie durvīm: ${p.first}`,s:relLabel(p),fn:()=>{if(locOf(p,h)===b.id&&(p.f>=35||p.steady||p.fam)){doEnter(b,'flat',p.id);toast(`${p.first} atver durvis.`)}else toast(locOf(p,h)===b.id?`${p.first} tevi neielaiž.`:'Neviens neatver durvis.')}}));
+    const hi=HOMES.findIndex(x=>x.b===b.id);
+    if(hi>0)ch.push({l:'Brīvs dzīvoklis',s:`${HOMES[hi].n} · ${usd(HOMES[hi].rent)}/nedēļā · īrē aģentūrā „Nekustamie īpašumi” Volstrītā`,fn:()=>{}});
+    ch.push({l:'Ieiet kāpņu telpā',fn:()=>doEnter(b,'lobby')});
+    ch.push({l:'Atpakaļ',exit:true});modal({t:b.n,sub:`Dzīvojamā ēka · ${DISTS[b.dist].n}`,b:res.length?'':'<p class="muted">Tu nepazīsti nevienu, kas šeit dzīvo.</p>',ch});return}
+  if(!isOpen(b)){toast(`${b.n} ir slēgts. Darba laiks ${hstr(b.hours[0])}–${hstr(b.hours[1])}.`);return}
+  if(b.type==='club'){const pr=pByKey('promoter');if(effBeauty()<15&&!(pr&&pr.f>=35)&&!(c.job&&jobDef().b.includes('club'))){modal({t:'Sejas kontrole',b:`<p>Apsargs paskatās uz tevi no galvas līdz kājām: „Šodien tikai pēc ielūgumiem.” <span class="muted">(Vajag skaistumu 15 vai pazīšanos ar promouteri Džeiku.)</span></p>`,ch:[{l:'Iedot apsargam $20',s:'Varbūt tas palīdzēs…',fn:()=>{if(c.money<20)return toast('Nepietiek naudas.');c.money-=20;doEnter(b);toast('Apsargs pamāj ar galvu.')}},{l:'Atkāpties',exit:true}]});return}}
   doEnter(b);
 }
 function doEnter(b,variant,owner){
@@ -162,11 +158,11 @@ function doEnter(b,variant,owner){
   ROOM=makeRoom(b,variant);
   P.x=ROOM.exit[0]+.5;P.y=ROOM.exit[1]+.5;P.path=[];P.target=null;P.dir=2;
   spawnRoom();cam.init=false;
-  // uzdevumi un tikšanās
-  S.quests.forEach(q=>{if(q.done)return;if(q.type==='deliver'&&q.b===b.id&&C().inv.pacina)completeQuest(q,'Paciņa nodota');
+  S.quests.forEach(q=>{if(q.done)return;if(q.type==='deliver'&&q.b===b.id&&C().inv.paka)completeQuest(q,'Paciņa nodota');
     if(q.type==='meet'&&q.b===b.id&&NPCS.some(n=>n.pid===q.giver))completeQuest(q,'Tikšanās notikusi')});
-  const waiting=NPCS.filter(n=>{const p=pById(n.pid);return p&&p.appt&&p.appt.day===S.day&&p.appt.b===b.id});
-  if(waiting.length){const p=pById(waiting[0].pid);toast(`${p.first} jau gaida tevi!`);p.appt.met=true}
+  const waiting=NPCS.filter(n=>{const p=pById(n.pid);return p&&p.appt&&p.appt.day===S.day&&p.appt.b===b.id&&!p.appt.met});
+  if(waiting.length){const p=pById(waiting[0].pid);p.appt.met=true;toast(p.appt.date?`${p.first} jau gaida tevi! Pieskaries, lai sāktu randiņu.`:`${p.first} jau gaida tevi!`)}
+  if(typeof storyEnter==='function')storyEnter(b);
   refreshUI();save();
 }
 function leaveBuilding(){
@@ -174,264 +170,328 @@ function leaveBuilding(){
   P.x=b.door[0]+.5;P.y=b.door[1]+.5;P.path=[];P.target=null;P.dir=b.side==='y'?0:1;
   spawnCity();cam.init=false;refreshUI();save();
 }
-function afterNewDay(quality){
+function afterNewDay(where){
   dismissComp(true);
-  if(quality==='home'||!quality){const b=bld(HOMES[C().home].b);doEnter(b,'home');P.x=ROOM.furn[0].x+ROOM.furn[0].w+.5;P.y=ROOM.furn[0].y+1.5;if(!ROOM.walk(Math.floor(P.x),Math.floor(P.y))){P.x=ROOM.exit[0]+.5;P.y=ROOM.exit[1]+.5}}
-  else if(quality==='hotel'){doEnter(bld('hotel'))}
-  else{S.where=null;ROOM=null;const b=bld(HOMES[C().home].b);P.x=b.door[0]+.5;P.y=b.door[1]+.5;spawnCity()}
-  const d=dateOf(S.T);tick(`Jauns rīts · ${S.day}. diena · ${MONL[d.m]} ${d.y}`,'y');refreshUI();
+  if(where==='home'||!where){const b=bld(HOMES[C().home].b);doEnter(b,'home');const bd=ROOM.furn[0];P.x=bd.x+bd.w+.5;P.y=bd.y+1.5;if(!ROOM.walk(Math.floor(P.x),Math.floor(P.y))){P.x=ROOM.exit[0]+.5;P.y=ROOM.exit[1]+.5}}
+  else if(where==='hotel'){doEnter(bld('plaza'))}
+  else{S.where=null;ROOM=null;P.x=Math.floor(P.x)+.5;P.y=Math.floor(P.y)+.5;spawnCity()}
+  const left=LEASE_DAYS-S.day;tick(S.extended?`☀ ${S.day}. diena Ņujorkā`:`☀ ${S.day}. diena · līdz īres līguma beigām ${left} ${left===1?'diena':'dienas'}`,'y');
+  if(S.day%7===0||S.day%7===6)tick(`🏠 Īres diena: ${S.day%7===0?'šodien':'rīt'} (${usd(rentDue())})`,'b');
+  refreshUI();
 }
-function onJail(){if(S.where){S.where=null;ROOM=null}dismissComp(true);const b=bld('police');P.x=b.door[0]+.5;P.y=b.door[1]+.5;P.path=[]}
 function endDayPrompt(){
-  if(!S||!S.c||$('#modalRoot').innerHTML)return;const c=C();if(c.jail){endDay('jail');return}
+  if(!S||!S.c||S.over||$('#modalRoot').innerHTML)return;const c=C();
   const home=S.where&&S.where.variant==='home';
-  if(home){modal({t:'Iet gulēt?',b:'<p>Diena beidzas, un paiet mēnesis.</p>',ch:[{l:'Gulēt',fn:()=>endDay('home')},{l:'Vēl ne',exit:true}]});return}
-  const hb=bld(HOMES[c.home].b);
-  modal({t:'Beigt dienu?',b:'<p>Tu neesi mājās. Gulēšana uz soliņa kaitē veselībai un laimei.</p>',ch:[
-    {l:'Taksometrs uz mājām',s:`${eur(15)} · 10 min`,fn:()=>{if(c.money<15)return toast('Nepietiek naudas.');c.money-=15;advance(10);if(S.where){S.where=null;ROOM=null}doEnter(hb,'home');endDayPrompt()}},
+  if(home){modal({t:'Iet gulēt?',b:`<p>Diena beidzas. Rīt ir ${S.day+1}. diena no ${LEASE_DAYS}.</p>`,ch:[{l:'Gulēt līdz rītam',fn:()=>endDay('home')},{l:'Vēl ne',exit:true}]});return}
+  const hb=bld(HOMES[c.home].b),dist=Math.abs(hb.door[0]-curPos()[0])+Math.abs(hb.door[1]-curPos()[1]),fare=Math.round(5+dist*.35);
+  modal({t:'Beigt dienu?',b:'<p>Tu neesi mājās. Gulēšana uz soliņa kaitē veselībai un higiēnai.</p>',ch:[
+    {l:'Taksometrs uz mājām',s:`${usd(fare)} · 15 min`,fn:()=>{if(c.money<fare)return toast('Nepietiek naudas.');c.money-=fare;advance(15);if(S.where){S.where=null;ROOM=null}doEnter(hb,'home');endDayPrompt()}},
     {l:'Gulēt uz soliņa',fn:()=>endDay('bench')},{l:'Turpināt dienu',exit:true}]});
 }
+function curPos(){return S.where?bld(S.where.b).door:[P.x,P.y]}
 
 /* ---------- Pavadonis ---------- */
-function setComp(p){S.comp=p.id;const n=NPCS.find(x=>x.pid===p.id);if(n){COMP_NPC=n;n.hold=false;n.talking=false;n.spd=S.where?1.6:3.2}log(`${p.first} pavada tevi.`,'g')}
+function setComp(p){S.comp=p.id;const n=NPCS.find(x=>x.pid===p.id);if(n){COMP_NPC=n;n.hold=false;n.talking=false;n.spd=S.where?1.6:3.3}log(`${p.first} pavada tevi.`,'g')}
 function dismissComp(silent){if(!S.comp)return;const p=pById(S.comp);S.comp=null;if(COMP_NPC){COMP_NPC.path=[];COMP_NPC=null}if(p&&!silent)toast(`${p.first} dodas savās gaitās.`)}
 function compP(){return S.comp?pById(S.comp):null}
 
 /* ---------- Darbs ---------- */
+function reqWhy(req){const c=C();for(const k in req){if(stat(k)<req[k])return `vajag ${STN[k].toLowerCase()} ${req[k]} (tev ${Math.floor(stat(k))})`}return null}
 function jobItems(b){
   const c=C(),out=[],h=hourNow();
-  JOBS.filter(j=>j.places.includes(b.type)).forEach(j=>{
-    if(c.job&&c.job.id===j.id&&c.job.b===b.id){
-      const inH=h>=j.hours[0]&&h<j.hours[1]-1;
-      out.push({l:c.job.worked?'Strādāt virsstundas':'Strādāt maiņu',s:`${j.lv[c.job.lvl]} · ${hstr(j.hours[0])}–${hstr(j.hours[1])}`,t:240,lock:!inH?`Maiņas laiks ${hstr(j.hours[0])}–${hstr(j.hours[1])}`:c.needs.energy<20?'Pārāk noguris':c.job.ot?'Šodien pietiks':null,fn:()=>workShift(j)});
-      out.push({l:'Lūgt paaugstinājumu',s:`Darba rezultāts ${Math.round(c.job.perf)}/100`,t:20,lock:c.job.lvl>=2?'Augstākais līmenis':null,fn:()=>{if(c.job.perf>=60&&rnd()<.35+c.stats.charm/250){c.job.lvl++;c.job.perf=10;addStat('happy',6);return `Apsveicam! Tagad tu esi ${j.lv[c.job.lvl]}.`}c.job.perf=Math.max(0,c.job.perf-8);return 'Priekšnieks saka: „Vēl ne.”'}});
+  JOBS.filter(j=>j.b.includes(b.id)).forEach(j=>{
+    if(c.job&&c.job.id===j.id){
+      const inH=h>=j.hours[0]&&h<=j.hours[1]-4;
+      out.push({l:'Strādāt maiņu',s:`${j.lv[c.job.lvl]} · maiņa 4 h · sākums ${hstr(j.hours[0])}–${hstr(j.hours[1]-4)} · pieredze ${Math.round(c.job.xp*10)/10}/${c.job.lvl===0?4:c.job.lvl===1?8:'—'}`,t:0,m:true,
+        lock:c.job.worked?'Šodien jau strādāji':!inH?`Maiņu var sākt ${hstr(j.hours[0])}–${hstr(j.hours[1]-4)}`:c.needs.energy<15?'Pārāk noguris — izguļies':null,fn:()=>workShift(j)});
       out.push({l:'Atkāpties no darba',t:0,fn:()=>{c.job=null;return 'Tu iesniedz atlūgumu.'}});
     } else {
-      const r=j.req||{},why=r.deg&&!c.degrees.includes(r.deg)?`vajag diplomu: ${DEG.find(d=>d.id===r.deg).n}`:r.looks&&c.stats.looks<r.looks?`vajag izskatu ${r.looks}`:r.charm&&c.stats.charm<r.charm?`vajag harizmu ${r.charm}`:r.health&&c.stats.health<r.health?`vajag veselību ${r.health}`:r.smarts&&c.stats.smarts<r.smarts?`vajag gudrību ${r.smarts}`:r.rep&&c.rep<r.rep?`vajag slavu ${r.rep}`:r.dance&&c.skills.dance<r.dance?`vajag deju prasmi ${r.dance}`:null;
-      out.push({l:`Pieteikties darbā: ${j.n}`,s:`${eur(j.sal[0])}/mēn. · ${hstr(j.hours[0])}–${hstr(j.hours[1])}${c.job?' · aizstās pašreizējo darbu':''}`,t:30,lock:why,fn:()=>{c.job={id:j.id,b:b.id,lvl:0,perf:0,missed:0,worked:false};addStat('happy',4);log(`Jauns darbs: ${j.lv[0]} (${b.n})`,'g');return `Tu esi pieņemts darbā: ${j.lv[0]}!`}});
+      const intro=j.intro&&!S.flags['intro_'+j.id]?pByKey(j.intro):null;
+      const why=reqWhy(j.req)||(intro?`vajag ieteikumu no ${intro.first} (draudzība 35)`:null);
+      out.push({l:`Pieteikties: ${j.n}`,s:`${usd(j.pay[0])} par maiņu · ${j.d}${c.job?' · aizstās pašreizējo darbu':''}`,t:20,lock:why,fn:()=>{c.job={id:j.id,b:b.id,lvl:0,xp:0,missed:0,worked:false};log(`Jauns darbs: ${j.lv[0]} (${b.n})`,'g');checkTrophies();return `Tu esi pieņemts darbā: ${j.lv[0]}! Nāc uz maiņu ${hstr(j.hours[0])}–${hstr(j.hours[1]-4)}.`}});
     }
   });
   return out;
 }
 function workShift(j){
-  const c=C();if(c.job.worked)c.job.ot=true;c.job.worked=true;
-  const gain=8+(c.stats.smarts+c.stats.charm)/25+(c.needs.fun>40?2:0);c.job.perf=Math.min(100,c.job.perf+gain);
-  need('energy',-25);need('fun',-8);let extra='';
-  if(j.tips){const t=R(15,60)+Math.round(c.stats.charm/4);c.money+=t;extra=` Dzeramnauda: ${eur(t)}.`}
-  if(c.job.ot){const b=Math.round(jobSalary()*.15);c.money+=b;extra+=` Virsstundas: +${eur(b)}.`}
-  if(j.perk==='rep')addRep(1);if(j.perk==='inf')addInf(.5);
-  if(c.job.perf>=100&&c.job.lvl<2){c.job.lvl++;c.job.perf=10;log(`Paaugstinājums! ${j.lv[c.job.lvl]}.`,'g');extra+=` Paaugstinājums: ${j.lv[c.job.lvl]}!`;checkTrophies()}
-  return `Maiņa padarīta.${extra}`;
+  const c=C();if(S.min+240>DAY_MIN){toast('Maiņai šodien vairs nepietiek laika.');return}
+  startMinigame(j.mg,c.job.lvl,score=>{
+    const base=j.pay[c.job.lvl],pay=Math.round(base*(.45+score*.85));let tips=0;
+    if(['barista','waiter'].includes(j.id))tips=Math.round(score*R(10,35)+stat('beauty')/6);
+    c.money+=pay+tips;c.job.worked=true;c.job.missed=0;S.flags.shifts=(S.flags.shifts||0)+1;c.job.xp+=score;
+    advance(240);need('energy',-10);need('hygiene',-12);
+    let msg=`Maiņa beigusies: +${usd(pay)}${tips?` + ${usd(tips)} dzeramnauda`:''}.`;
+    if((c.job.lvl===0&&c.job.xp>=4)||(c.job.lvl===1&&c.job.xp>=8)){c.job.lvl++;msg+=` Paaugstinājums! Tagad tu esi ${j.lv[c.job.lvl]}.`;log(`Paaugstinājums: ${j.lv[c.job.lvl]}!`,'g');addFame(2)}
+    if(score<.3)msg+=' Priekšnieks nav apmierināts.';
+    log(msg,'g');toast(msg);checkTrophies();if(typeof storyHour==='function')storyHour();refreshUI();save();
+  });
 }
 
-/* ---------- Mijiedarbības ar objektiem ---------- */
+/* ---------- Darbības ---------- */
 function I(l,s,t,cost,fn,lock,opt){return Object.assign({l,s,t,cost,fn,lock},opt||{})}
 function M_(l,s,fn,lock){return {l,s,t:0,fn,lock,m:true}}
-const withComp=(l,s,t,cost,fn,lock)=>{const p=compP();return p?[I(`${l} (kopā ar ${p.first})`,s,t,cost,()=>fn(p),lock)]:[]};
-const compBoost=(p,c_,r_)=>{p.close=cl(p.close+c_);if(p.rel!=='none'&&!isFamily(p)&&ageOf(p.bT)>=18)p.rom=cl(p.rom+r_);if(p.rel==='acq'&&p.close>=45)p.rel='friend'};
-function eat(v,f=0){need('food',v);need('fun',f)}
+const night=()=>hourNow()>=22;
+const withComp=(l,s,t,cost,fn,lock)=>{const p=compP();return p?[I(`${l} (kopā ar ${nAcc(p.first)})`,s,t,cost,()=>fn(p),lock)]:[]};
+const bond=(p,f_,r_)=>{p.f=cl(p.f+f_*socialMul(),0,FMAX);if(!p.noRom&&!p.fam&&r_)p.rom=cl(p.rom+r_*socialMul(),0,FMAX);p.lastSeen=S.day};
+function eat(v){need('food',v)}
+function addInv(k,n=1){const i=C().inv;i[k]=(i[k]||0)+n}
+function fxs(o){return Object.entries(o).map(([k,v])=>(v>0?'+':'')+v+' '+(STN[k]||k).toLowerCase()).join(', ')}
+function act(l,t,cost,eff,extra,lock,msg){return I(l,[fxs(eff),extra].filter(Boolean).join(' · '),t,cost,()=>{for(const k in eff)addSt(k,eff[k]);if(typeof msg==='function')return msg();return msg||'Darīts!'},lock)}
+const wc=()=>[I('Izmantot tualeti','Tualete 100%',5,0,()=>{need('bladder',100);return 'Atvieglojums!'})];
 const ACT={
-  cafe:b=>[I('Kafija','+enerģija',10,4,()=>{need('energy',15);need('fun',2);return 'Stipra, karsta kafija.'}),I('Kafija līdzņemšanai','Somā',2,4,()=>{addInv('kafija');return 'Kafija ir līdzi.'}),I('Kūka','+sāta',15,6,()=>{eat(20,4);return 'Mmm, ogu kūka.'}),
-    ...withComp('Kafija','+draudzība, +romantika',30,8,p=>{compBoost(p,8,4);need('energy',12);return `Jūs ar ${p.first} parunājāties pie kafijas.`}),...jobItems(b)],
-  cafeTable:b=>[I('Lasīt avīzi','+gudrība',20,0,()=>{addStat('smarts',1);need('fun',3);return 'Tu uzzini jaunāko pilsētā.'}),...withComp('Parunāties pie galdiņa','+draudzība',30,0,p=>{compBoost(p,7,3);return 'Laba saruna.'})],
-  icecream:b=>[I('Saldējums','+prieks',5,3,()=>{eat(10,6);return 'Zemeņu saldējums!'}),...withComp('Saldējums','+romantika',10,6,p=>{compBoost(p,5,6);return 'Saldi!'}),...jobItems(b)],
-  restCounter:b=>[I('Ēdiens līdzņemšanai','+sāta',10,12,()=>{eat(40);return 'Gards ēdiens.'}),...jobItems(b)],
-  restTable:b=>[I(hourNow()>=17?'Vakariņas':'Pusdienas','+sāta, +prieks',45,22,()=>{eat(60,5);return 'Lieliska maltīte!'}),...withComp('Vakariņas divatā','+romantika',90,55,p=>{eat(60,8);compBoost(p,10,12);return `Romantiskas vakariņas ar ${p.first}.`})],
-  bar:b=>[I('Dzēriens','+prieks',10,6,()=>{need('fun',8);need('energy',-3);return 'Atsvaidzinoši!'}),I('Kokteilis','+prieks',15,12,()=>{need('fun',14);return 'Mojito ar piparmētru.'}),...withComp('Uzsaukt dzērienu','+romantika',15,12,p=>{compBoost(p,6,8);need('fun',8);return `${p.first} pasmaida.`}),...jobItems(b)],
-  vipbar:b=>[I('Šampanietis','+prieks, +slava',15,60,()=>{need('fun',20);addRep(1);return 'Burbuļi un zelts.'}),...withComp('Šampanietis divatā','+romantika',20,120,p=>{compBoost(p,8,14);return 'Toasts par jums!'}),...jobItems(b)],
-  pool:b=>[I('Spēlēt biljardu','+prieks',30,5,()=>{need('fun',12);addStat('smarts',.5);return rnd()<.5?'Tu uzvari!':'Šoreiz zaudējums.'}),...withComp('Biljards','+draudzība',30,5,p=>{compBoost(p,8,2);need('fun',12);return 'Jautra partija.'})],
-  karaoke:b=>[I('Dziedāt karaoke','Harizmas pārbaude',30,0,()=>{need('fun',10);if(rnd()<.3+C().stats.charm/140){addRep(2);addStat('charm',1);return 'Zāle aplaudē!'}addRep(-1);return 'Nu… vismaz bija jautri.'})],
-  dance:b=>[M_('Dejot','Deju minispēle · 30 min',()=>startDance(b,null)),...(compP()?[M_(`Dejot kopā ar ${compP().first}`,'+romantika',()=>startDance(b,compP()))]:[]),...(b.type==='club'||b.type==='vip'?[]:[])],
-  danceLesson:b=>[I('Deju nodarbība','+deju prasme',60,25,()=>{C().skills.dance=cl(C().skills.dance+4);need('fun',6);return `Deju prasme: ${Math.round(C().skills.dance)}`}),M_('Vingrināties','Deju minispēle',()=>startDance(b,null))],
-  danceDesk:b=>jobItems(b),
-  dj:b=>[I('Palūgt dziesmu','+prieks',5,0,()=>{need('fun',4);return 'DJ uzliek tavu mīļāko dziesmu!'}),...jobItems(b)],
+  wc:b=>wc(),
+  shower:b=>[I('Iet dušā','Higiēna 100%',20,0,()=>{need('hygiene',100);return 'Svaigs kā rasa!'})],
+  cafe:b=>[I('Kafija','+30 miegs, −20 tualete',10,4,()=>{need('energy',30);need('bladder',-20);return 'Stipra, karsta kafija.'}),I('Kafija līdzņemšanai','Somā',2,4,()=>{addInv('kafija');return 'Kafija ir līdzi.'}),
+    I('Mellenu mafins','+20 sāta',10,5,()=>{eat(20);return 'Mmm!'}),I('Nopirkt avīzi','Somā',1,1,()=>{addInv('avize');return 'Svaiga „New York Daily”.'}),...jobItems(b)],
+  cafeTable:b=>[act('Lasīt avīzi',30,0,{culture:3},C().inv.avize?'izlieto avīzi':'',!C().inv.avize?'Vajag avīzi ($1 pie letes)':null,()=>{C().inv.avize--;return 'Tu uzzini jaunāko pilsētā.'}),...withComp('Kafija un saruna','+draudzība',30,8,p=>{bond(p,8,3);need('energy',15);return `Jauka saruna ar ${nAcc(p.first)}.`})],
+  deli:b=>[I('Pārtikas grozs','+4 maltītes ledusskapī',10,28,()=>{C().fridge+=4;return 'Ledusskapis būs pilns.'}),I('Sviestmaize','Somā',2,6,()=>{addInv('sviestmaize');return 'Ar pastrami!'}),I('Hotdogs','Somā',2,3,()=>{addInv('hotdog');return 'Ar sinepēm.'}),I('Avīze','Somā',1,1,()=>{addInv('avize');return 'Svaiga avīze.'}),I('Bodegas kafija','+20 miegs',5,2,()=>{need('energy',20);need('bladder',-15);return 'Rūgta, bet stipra.'})],
+  grocery:b=>ACT.deli(b),
+  pizza:b=>[act('Picas šķēle',60,7,{health:5,beauty:-1},'+50 sāta',null,()=>{eat(50);return 'Ņujorkas pica — plāna un milzīga!'}),I('Pica līdzņemšanai','+2 maltītes ledusskapī',10,15,()=>{C().fridge+=2;return 'Kaste zem paduses.'})],
+  pizzaTable:b=>[act('Picas šķēle',60,7,{health:5,beauty:-1},'+50 sāta',null,()=>{eat(50);return 'Gardi!'}),...withComp('Pica kopā','+draudzība',60,14,p=>{eat(50);bond(p,8,3);return 'Jūs smejaties par siera stīgām.'})],
+  diner:b=>[act('Burgers un frī',45,9,{health:-1,humor:1},'+55 sāta',null,()=>{eat(55);return 'Klasiskā amerikāņu ēstuve!'}),I('Kafija un ābolu pīrāgs','+20 sāta, +15 miegs',30,5,()=>{eat(20);need('energy',15);need('bladder',-10);return 'Kā mājās.'})],
+  dinerTable:b=>[...ACT.diner(b),...withComp('Piena kokteilis divatā','+romantika',30,8,p=>{bond(p,5,8);return 'Divi salmiņi, viena glāze.'})],
+  dimsum:b=>[I('Pelmeņi līdzņemšanai','+1 maltīte ledusskapī',10,8,()=>{C().fridge++;return 'Karsti pelmeņi.'}),...jobItems(b)],
+  dimsumTable:b=>[act('Dim sum pusdienas',60,18,{health:2,culture:1},'+50 sāta',null,()=>{eat(50);return 'Garneļu pelmeņi kūp tvaikā.'}),...withComp('Pusdienas kopā','+draudzība',60,30,p=>{eat(50);bond(p,8,4);return 'Jūs mācāties ēst ar irbulīšiem.'})],
+  seaportBar:b=>[act('Glāze vīna ar skatu uz upi',30,14,{culture:1,humor:1},'',null,'Bruklinas tilts mirdz.'),...jobItems(b)],
+  seaportTable:b=>[act('Jūras velšu vakariņas',90,45,{culture:2,beauty:1},'+60 sāta',null,()=>{eat(60);return 'Omārs un skats uz ostu.'})],
+  pub:b=>[act('Iedzert pie bāra',90,34,{humor:8},'−20 tualete',null,()=>{need('bladder',-20);return pick(['Bārmenis izstāsta anekdoti.','Tu iepazīsti visu bāru.','Vēl vienu!'])}),I('Alus kauss','+2 humors, −15 tualete',30,6,()=>{addSt('humor',2);need('bladder',-15);return 'Atspirdzinoši.'}),...withComp('Uzsaukt dzērienu','+draudzība',30,12,p=>{bond(p,7,4);return `${p.first} paceļ glāzi.`})],
+  pubTable:b=>[act('Tērzēt ar vietējiem',30,0,{humor:2},'',null,'Tu uzzini, kurš kuru satiek.')],
+  pool:b=>[act('Spēlēt biljardu',30,3,{humor:1,culture:1},'',null,()=>rnd()<.5?'Tu uzvari!':'Šoreiz zaudējums.'),...withComp('Biljards kopā','+draudzība',30,3,p=>{bond(p,8,2);return 'Jautra partija.'})],
+  comedyTable:b=>[act('Skatīties stand-up šovu',90,25,{humor:8},'',null,'Tu smejies līdz asarām.'),...withComp('Šovs kopā','+draudzība',90,50,p=>{addSt('humor',6);bond(p,9,4);return 'Jūs abi smejaties.'})],
+  comedyStage:b=>[I('Uzstāties atvērtajā mikrofonā','Humora pārbaude · +slava',60,0,()=>{const c=C();if(rnd()<.2+c.st.humor/110){addSt('humor',3);addFame(3);return 'Zāle smejas un aplaudē! Tevi atpazīst.'}addSt('humor',1);addFame(-1);return 'Klusums… Kāds klepo. Bet tu kaut ko iemācījies.'},C().st.humor<20?'Vajag humoru 20':null)],
+  bar:b=>[act('Kokteilis',30,12,{humor:3},'−10 tualete',null,()=>{need('bladder',-10);return 'Kosmopolitans!'}),...withComp('Uzsaukt dzērienu','+romantika',20,12,p=>{bond(p,5,7);return `${p.first} pasmaida.`})],
+  gallery:b=>[act('Aplūkot mākslu',45,0,{culture:4},'',null,'Iedvesmojoši.'),...withComp('Izstāde kopā','+draudzība',45,0,p=>{addSt('culture',3);bond(p,6,5);return 'Jūs apspriežat gleznas.'})],
+  galleryDesk:b=>[I('Nopirkt gleznu','$150 · mājām · +popularitāte',10,150,()=>{C().furn.art='paint1';return 'Glezna nosūtīta uz mājām.'},C().furn.art?'Gleznas vieta jau aizņemta':null),I('Nopirkt oriģinālu','$2800 · +5 popularitāte',10,2800,()=>{C().furn.art='paint2';return 'Oriģināls darbs tavās mājās!'},C().furn.art==='paint2'?'Jau pieder':null)],
+  records:b=>[I('Nopirkt mūzikas albumu','Dāvana · patīk mūzikas mīļotājiem',5,15,()=>{addInv('cd');return 'Albums somā.'}),I('Nopirkt filmas DVD','Dāvana · patīk kino mīļotājiem',5,20,()=>{addInv('dvd');return 'DVD somā.'})],
+  recordsDesk:b=>ACT.records(b),
+  listen:b=>[act('Klausīties plates',30,0,{culture:1,humor:1},'',null,'Vecais labais roks.')],
+  treadmill:b=>[act('Skriet uz skrejceliņa',60,10,{health:4},'−15 higiēna, −12 miegs',C().needs.energy<15?'Pārāk noguris':null,()=>{need('hygiene',-15);need('energy',-12);return 'Sviedri līst!'})],
+  weights:b=>[act('Svarcelšana',60,10,{strength:4,beauty:1},'−15 higiēna, −12 miegs',C().needs.energy<15?'Pārāk noguris':null,()=>{need('hygiene',-15);need('energy',-12);return 'Muskuļi aug!'})],
+  yoga:b=>[act('Joga',45,10,{health:2,beauty:2},'+5 miegs',null,()=>{need('energy',5);return 'Prāts ir mierīgs.'})],
+  gymDesk:b=>[I('Proteīna kokteilis','+15 sāta, +1 spēks',5,5,()=>{eat(15);addSt('strength',1);return 'Banānu garša.'})],
+  kungfu:b=>[act('Kung-fu nodarbība',90,25,{strength:5,health:2},'−20 higiēna, −15 miegs',C().needs.energy<15?'Pārāk noguris':null,()=>{need('hygiene',-20);need('energy',-15);return 'Meistars Vongs ir apmierināts.'})],
+  kfDesk:b=>ACT.kungfu(b),
+  massage:b=>[act('Masāža',60,60,{health:2,beauty:1},'+30 miegs',null,()=>{need('energy',30);return 'Tu gandrīz aizmiegi.'})],
+  massageDesk:b=>ACT.massage(b),
+  karaoke:b=>[I('Dziedāt karaoke','Humora pārbaude',30,5,()=>{if(rnd()<.3+C().st.humor/140){addSt('humor',3);addFame(1);return 'Zāle dzied līdzi!'}addSt('humor',1);return 'Tu aizmirsi vārdus, bet visi smējās.'}),...withComp('Duets','+romantika',30,10,p=>{bond(p,7,8);return 'Jūsu duets ir šova zvaigzne!'})],
+  tea:b=>[act('Tējas ceremonija',45,12,{culture:3},'+10 miegs',null,()=>{need('energy',10);return 'Jasmīns un klusums.'}),...withComp('Tēja divatā','+draudzība',45,24,p=>{bond(p,7,5);return 'Mierīga saruna.'})],
+  teaDesk:b=>ACT.tea(b),
+  market:b=>[I('Plīša lācītis','Dāvana · $10',3,10,()=>{addInv('lacis');return 'Panda!'}),I('Ceļvedis pa pasauli','Dāvana · $15',3,15,()=>{addInv('celvedis');return 'Ceļvedis somā.'}),I('Šokolādes konfektes','Dāvana · $8',3,8,()=>{addInv('sokolade');return 'Konfektes somā.'})],
+  marketFruit:b=>[I('Augļi','+20 sāta, +1 veselība',5,4,()=>{eat(20);addSt('health',1);return 'Liči un mango.'})],
+  pawn:b=>{const c=C(),gifts=Object.keys(c.inv).filter(k=>c.inv[k]>0&&ITEMS[k].gift);return [...gifts.map(k=>I(`Pārdot: ${ITEMS[k].n}`,`saņemsi ${usd(Math.floor(ITEMS[k].p*.4))}`,5,0,()=>{c.inv[k]--;c.money+=Math.floor(ITEMS[k].p*.4);return 'Darījums noslēgts.'})),
+    I('„Lēta” zelta kaklarota','Dāvana · +2 noziedzīgums (zagta?)',5,150,()=>{addInv('rota');addSt('crime',2);return 'Nejautā, no kurienes.'})]},
+  bank:b=>[I('Pieprasīt pārvedumu no vecākiem','Reizi 10 dienās',10,0,()=>momMoney(),momLock())],
+  nyse:b=>jobItems(b),
+  nyseInfo:b=>[act('Ekskursija biržā',45,15,{culture:4},'',null,'Tu redzi tirdzniecības zāli.'),...jobItems(b)],
+  officeDesk:b=>jobItems(b),officeJobs:b=>jobItems(b),
+  realestate:b=>[M_('Mājokļu piedāvājumi','Īrēt citu dzīvokli',()=>homeModal())],
+  hotel:b=>[I('Īrēt numuru un gulēt','Diena beidzas',0,250,()=>{setTimeout(()=>endDay('hotel'),30);return 'Numurs ar skatu uz Centrālparku.'})],
+  hotelTea:b=>[act('Pēcpusdienas tēja „Plaza”',45,35,{culture:3,beauty:1},'',null,'Ļoti smalki.')],
+  plazaBar:b=>[act('Martini',30,18,{humor:2,culture:1},'',null,'Sakratīts, nevis samaisīts.'),...withComp('Martini divatā','+romantika',30,36,p=>{bond(p,6,9);return 'Džezs un sveču gaisma.'})],
+  opera:b=>[act('Opera un balets',180,150,{culture:12,beauty:-1},'',null,'Brāvo! Brāvo!')],
+  play:b=>[act('Brodvejas izrāde',150,90,{culture:8,beauty:-1},'',null,'Mūzikls ir lielisks!')],
+  snacks:b=>[I('Popkorns','+15 sāta',5,5,()=>{eat(15);return 'Sāļš popkorns.'}),...wc()],
+  movie:b=>[act('Skatīties filmu',120,14,{culture:3,humor:3},'',null,()=>pick(['Asa sižeta grāvējs!','Romantiska komēdija.','Šausmene — brr!']))],
+  dance:b=>[M_('Dejot','Deju minispēle · +humors, +slava',()=>freeDance(b,null)),...(compP()?[M_(`Dejot kopā ar ${nAcc(compP().first)}`,'+romantika',()=>freeDance(b,compP()))]:[])],
+  dj:b=>[I('Palūgt dziesmu','+1 humors',5,0,()=>{addSt('humor',1);return 'DJ uzliek tavu mīļāko dziesmu!'})],
+  clubDesk:b=>jobItems(b),
+  arcade:b=>[act('Spēlēt videospēles',60,8,{humor:night()?6:3},night()?'vēlā nakts — dubults humors':'pēc 22:00 humors aug ātrāk',null,'Jauns rekords!'),...withComp('Spēlēt kopā','+draudzība',60,16,p=>{bond(p,8,2);return 'Kurš uzvarēja? Strīdīgi.'})],
+  arcadeDesk:b=>[I('Nopirkt videospēli','Dāvana · $50',5,50,()=>{addInv('spele');return 'Jaunākā spēle somā.'}),I('Basketbola bumba','Dāvana · $30',5,30,()=>{addInv('bumba');return 'Bumba somā.'})],
+  view:b=>[act('Skatīties uz Manhetenu',45,25,{culture:5},'',null,()=>NIGHT>.3?'Pilsēta mirdz kā zvaigžņu jūra.':'Redzams līdz pat Brīvības statujai!')],
+  empireShop:b=>[I('Ceļvedis pa pasauli','Dāvana',5,25,()=>{addInv('celvedis');return 'Ceļvedis somā.'})],
+  boathouse:b=>[act('Airēt laivu pa ezeru',60,15,{health:3,humor:1},'',null,'Pīles peld līdzās.')],
   clothes:b=>[M_('Apskatīt apģērbus','Butiks',()=>shopClothes(false))],
-  luxe:b=>[M_('Apskatīt kolekciju','Dizaineru apģērbi',()=>shopClothes(true))],
+  luxe:b=>[M_('Dizaineru kolekcija','Dārgi, bet stilīgi',()=>shopClothes(true))],
   mirror:b=>[M_('Pārģērbties','Garderobe',()=>wardrobeModal())],
-  shopCounter:b=>[...(b.type==='mall'?[]:[]),...jobItems(b)],
-  elecCounter:b=>jobItems(b),furnCounter:b=>[M_('Mēbeļu katalogs','Pirkt mēbeles',()=>furnShop())].concat(jobItems(b)),superCounter:b=>jobItems(b),
-  hair:b=>[M_('Frizūra','Mainīt matus',()=>hairModal())],salon:b=>[I('Manikīrs','+izskats',30,35,()=>{addStat('looks',1);return 'Nevainojami nagi.'}),I('Sejas maska','+izskats, +prieks',40,50,()=>{addStat('looks',1);need('fun',5);return 'Āda mirdz.'}),...jobItems(b)],
-  flowers:b=>[I('Ziedu pušķis','Dāvanai',5,25,()=>{addInv('ziedi');return 'Rozes ietītas papīrā.'}),I('Plīša lācītis','Dāvanai',5,20,()=>{addInv('lacis');return 'Mīksts lācītis.'}),...jobItems(b)],
-  gifts:b=>[M_('Dāvanu veikals','Šokolāde, smaržas, rotas…',()=>giftShop())].concat(jobItems(b)),
-  foodcourt:b=>[I('Ātrā ēdināšana','+sāta',20,8,()=>{eat(45,3);return 'Burgers un frī kartupeļi.'}),...withComp('Pusdienas kopā','+draudzība',30,16,p=>{eat(45,4);compBoost(p,6,3);return 'Jautras pusdienas.'})],
-  grocery:b=>[I('Pārtikas grozs','+5 maltītes ledusskapī',10,40,()=>{C().fridge+=5;return 'Ledusskapis būs pilns.'}),I('Sviestmaize','Somā',3,5,()=>{addInv('sviestmaize');return 'Sviestmaize somā.'}),I('Enerģijas dzēriens','Somā',3,3,()=>{addInv('energ');return 'Enerģija bundžā.'}),I('Šokolādes konfektes','Dāvanai',3,12,()=>{addInv('sokolade');return 'Konfektes somā.'}),I('Vīna pudele','Dāvanai',3,30,()=>{addInv('vins');return 'Labs sarkanvīns.'})],
-  elec:b=>[M_('Tehnika mājām','TV, konsole, dators',()=>furnShop(['tv','console','stereo','desk']))].concat(jobItems(b)),
-  furn:b=>[M_('Mēbeļu katalogs','Pirkt mēbeles',()=>furnShop())],
-  realestate:b=>[M_('Mājokļu piedāvājumi','Īrēt vai pirkt',()=>homeModal())].concat(jobItems(b)),
-  cars:b=>[M_('Transportlīdzekļi','Motorollers, auto…',()=>vehModal())],
-  bank:b=>bankItems().concat(jobItems(b)),atm:()=>bankItems(),
-  work:b=>{const c=C();if(c.job&&c.job.b===b.id)return jobItems(b);return [M_('Meklēt darbu','Biroja vakances',()=>listModal('Vakances',jobItems(b)))]},
-  officeJobs:b=>jobItems(b).concat(bizItems()),
-  lecture:b=>{const c=C(),h=hourNow();if(!c.study)return [I('Klausīties lekciju kā viesis','+gudrība',90,0,()=>{addStat('smarts',1);return 'Interesanta lekcija.'}),I('Publiskās runas kurss','+harizma',60,200,()=>{addStat('charm',3);return 'Tu runā pārliecinošāk.'})];
-    const d=DEG.find(x=>x.id===c.study.id);return [I('Apmeklēt lekciju',`${d.n}: ${Math.floor(c.study.p)}/${d.m}`,180,0,()=>{c.study.p++;addStat('smarts',2);need('energy',-8);if(c.study.p>=d.m){c.degrees.push(d.id);c.study=null;log(`Tu absolvē universitāti: ${d.n}!`,'g');checkTrophies();return `Diploms! ${d.n}`}return 'Vēl viens solis līdz diplomam.'},h<8||h>=18?'Lekcijas 8:00–18:00':null),I('Publiskās runas kurss','+harizma',60,200,()=>{addStat('charm',3);return 'Tu runā pārliecinošāk.'})]},
-  uniDesk:b=>{const c=C();return c.study?[I('Pamest studijas','',5,0,()=>{c.study=null;return 'Tu pamet studijas.'})]:[M_('Iestāties studijās','Studiju programmas',()=>degModal())]},
-  read:b=>[I('Lasīt grāmatu','+gudrība, +prieks',60,0,()=>{addStat('smarts',2);need('fun',3);return 'Lieliska grāmata.'}),...(C().study?[I('Mācīties eksāmenam','+studiju progress',120,0,()=>{C().study.p+=.5;addStat('smarts',1);return 'Konspekti ir kārtībā.'})]:[])],
-  libDesk:b=>jobItems(b),
-  art:b=>[I('Aplūkot mākslu','+gudrība, +prieks',30,0,()=>{addStat('smarts',1);need('fun',6);return 'Iedvesmojoši.'}),...withComp('Izstāde kopā','+romantika',40,0,p=>{compBoost(p,6,6);return 'Jūs apspriežat gleznas.'})],
-  buyArt:b=>[I('Nopirkt gleznu','160 € · mājai',10,160,()=>{C().furn.art='paint1';return 'Glezna nosūtīta uz mājām.'},C().furn.art?'Gleznas vieta jau aizņemta':null),I('Nopirkt mākslas darbu','3200 € · mājai',10,3200,()=>{C().furn.art='paint2';addRep(1);return 'Oriģināls darbs tavās mājās!'},C().furn.art==='paint2'?'Jau pieder':null)].concat(jobItems(b)),
-  govPodium:b=>{const c=C(),o=c.office,out=[];if(['saeima','ministrs','premjers'].includes(o))out.push(M_('Iesniegt likumprojektu','Saeimas balsojums',()=>lawModal()));if(o==='deputats'||o==='mers')out.push(M_('Pilsētas projekti','Domes lēmums',()=>projModal()));
-    if(o)out.push(I('Uzrunāt kolēģus','+ietekme, +slava',60,0,()=>{addInf(2);if(rnd()<.3+c.stats.charm/150){addRep(2);return 'Runa izpelnās aplausus.'}return 'Daži aizmieg.'}));if(o==='prezidents')out.push(I('Valsts vizīte','+slava, +ietekme',120,0,()=>{addRep(4);addInf(2);return 'Vizīte stiprina valsts tēlu.'}));
-    if(!out.length)out.push(I('Uzkāpt tribīnē','Tikai deputātiem…',5,0,()=>{addRep(-1);return 'Apsardze tevi pieklājīgi aizved prom.'}));return out},
-  govSeats:b=>[I('Novērot sēdi','+ietekme, +gudrība',60,0,()=>{addInf(1);addStat('smarts',1);return 'Tu redzi, kā tiek pieņemti lēmumi.'}),I('Protestēt','+slava, aresta risks',30,0,()=>{if(rnd()<(S.country.laws.includes('police')?.12:.06)){goJail(2);return 'Policija tevi aiztur.'}addRep(2);if(C().party&&!S.country.gov.includes(C().party))C().standing=cl(C().standing+3);return 'Tavu plakātu rāda ziņās.'})],
-  govDesk:b=>{const c=C();return [M_('Pieteikties vēlēšanām','Kandidēšana',()=>candModal(),c.cand?'Jau esi kandidāts':(!c.party&&c.inf<75)?'Vajag partiju':null),...(c.office?[I('Slēgta lobija sanāksme','+ietekme, korupcijas risks',60,0,()=>{addInf(4);c.standing=cl(c.standing+2);if(rnd()<.35){c.corrupt+=8;c.money+=R(2000,8000);return 'Tev „pateicas” aploksnē.'}return 'Noderīgi kontakti.'})]:[]),...jobItems(b)]},
-  partyDesk:b=>partyItems().concat(jobItems(b)),
-  phonebank:b=>[I('Zvanīt vēlētājiem','+kampaņas punkti',120,0,()=>{C().campaign+=6;C().standing=cl(C().standing+2);return 'Tu pārliecināji desmitiem vēlētāju.'},!C().cand?'Vajag kandidēt vēlēšanās':null)],
-  police:b=>[I('Brīvprātīgais patruļā','+slava',60,0,()=>{addRep(1);addStat('health',1);return 'Ielas ir drošākas.'}),...jobItems(b)],
-  tvshow:b=>[I('Tok-šovs','Harizmas pārbaude',60,0,()=>{const c=C();if(rnd()<.35+c.stats.charm/150){addRep(5);addInf(2);return 'Tu esi šova zvaigzne!'}addRep(-4);return 'Neveikls teikums kļūst par mēmi.'},C().rep<15&&!C().office?'Vajag slavu 15':null)],
-  news:b=>[I('Kampaņas reklāma','+12 kampaņas punkti',30,1500,()=>{C().campaign+=12;return 'Tavi plakāti ir visā Ostmalā.'},!C().cand?'Vajag kandidēt vēlēšanās':null),I('Viedokļraksts','+ietekme',60,0,()=>{if(rnd()<.3+C().stats.smarts/140){addInf(2);addRep(1);return 'Raksts tiek plaši apspriests.'}return 'Rakstu gandrīz neviens nelasa.'}),...jobItems(b)],
-  mediaDesk:b=>jobItems(b),
-  photoshoot:b=>[I('Fotosesija','+slava, +nauda',90,0,()=>{const c=C();if(c.stats.looks+styleScore()/2>70){addRep(3);c.money+=200;return 'Bildes ir žurnāla vākam! +200 €'}addRep(1);return 'Fotogrāfs saka: „Vēl jāpastrādā.”'},C().stats.looks<45?'Vajag izskatu 45':null)],
-  agencyDesk:b=>jobItems(b),
-  hotel:b=>[I('Īrēt numuru un gulēt','Diena beidzas',0,120,()=>{setTimeout(()=>endDay('hotel'),30);return 'Numurs ar skatu uz jūru.'}),...withComp('Romantiska nakts viesnīcā','+romantika',0,180,p=>{compBoost(p,8,15);setTimeout(()=>endDay('hotel'),30);return 'Neaizmirstama nakts.'},compP()&&compP().rom<45?'Vajag romantiku 45':null),...jobItems(b)],
-  piano:b=>[I('Spēlēt klavieres','+harizma, +prieks',30,0,()=>{addStat('charm',1);need('fun',8);return 'Skaista melodija.'})],
-  hosp:b=>{const pr=S.country.laws.includes('health')?20:80;return [I('Ārsta vizīte','+veselība',60,pr,()=>{addStat('health',15);return 'Ārsts izraksta ārstēšanu.'}),I('Psihoterapeits','+laime',60,60,()=>{addStat('happy',10);need('fun',5);return 'Saruna palīdz.'}),I('Plastiskā ķirurģija','+izskats (ar risku)',240,5000,()=>{if(rnd()<.85){addStat('looks',12);return 'Operācija izdodas.'}addStat('looks',-8);addStat('health',-10);return 'Komplikācijas…'}),...jobItems(b)]},
-  treadmill:b=>[I('Skriet','+veselība, +izskats',60,0,()=>{addStat('health',3);addStat('looks',1);need('energy',-12);return 'Labs skrējiens!'},C().needs.energy<15?'Pārāk noguris':null)],
-  weights:b=>[I('Spēka treniņš','+izskats, +veselība',60,0,()=>{addStat('health',2);addStat('looks',2);need('energy',-14);return 'Muskuļi aug!'},C().needs.energy<15?'Pārāk noguris':null)],
-  yoga:b=>[I('Joga','+prieks, +laime',45,0,()=>{need('fun',5);addStat('happy',2);need('energy',5);return 'Prāts ir mierīgs.'})],
-  gymDesk:b=>jobItems(b),
-  movie:b=>[I('Skatīties filmu','+prieks',120,10,()=>{need('fun',30);return pick(['Asa sižeta grāvējs!','Romantiska komēdija.','Šausmene — brr!'])}),...withComp('Filma divatā','+romantika',120,20,p=>{need('fun',30);compBoost(p,6,10);return 'Jūs sadevāties rokās tumšajā zālē.'})],
-  snacks:b=>[I('Popkorns','+sāta',5,5,()=>{eat(12,3);return 'Sālīts popkorns.'})],
-  slots:b=>[10,50,200].map(v=>I(`Likt ${v} €`,'Laimes spēle',5,v,()=>{need('fun',4);const r=rnd();if(r<.02){C().money+=v*20;return `DŽEKPOTS! +${eur(v*20)}`}if(r<.3){C().money+=v*2;return `Laimests: ${eur(v*2)}`}return 'Neveiksme.'})),
-  roulette:b=>[I('Likt 100 € uz sarkano','Gandrīz 50/50',5,100,()=>{need('fun',6);if(rnd()<.47){C().money+=200;return 'Sarkanais! +200 €'}return 'Melnais. Zaudējums.'}),...jobItems(b)],
-  yacht:b=>[I('Izbraukt ar jahtu','+prieks, +slava',120,300,()=>{need('fun',30);addRep(2);return 'Vējš matos un jūra apkārt.'}),...withComp('Jahtas brauciens divatā','+romantika',120,350,p=>{need('fun',30);compBoost(p,10,16);return 'Saulriets jūrā.'}),...jobItems(b)],
-  smuggle:b=>{const c=C(),pol=S.country.laws.includes('police')?1.6:1,night=hourNow()>=21?.6:1;return [I('Kontrabandas darījums','Peļņa un risks (naktī drošāk)',60,0,()=>{const r=rnd();if(r<.15*pol*night){goJail(R(6,24));return 'Policijas reids!'}if(r<.4)return 'Kravas nav.';const g=R(2000,6000);c.money+=g;return `Darījums izdodas: +${eur(g)}.`}),
-    I('Kompromats uz konkurentu','+ietekme, risks',60,3000,()=>{if(rnd()<.22){addRep(-15);c.corrupt+=10;return 'Kompromats atsitas pret tevi!'}addInf(6);c.standing=cl(c.standing+4);return 'Konkurents ir spiests klusēt.'},!c.party?'Vajag partiju':null),I('Uzpirkt ierēdni','+ietekme, korupcija',30,2000,()=>{c.corrupt+=10;addInf(5);return 'Dokumenti pēkšņi kustas ātrāk.'})]},
-  portDesk:b=>jobItems(b),
-  mail:b=>[I('Pārbaudīt pastkastīti','',2,0,()=>{if(S.mailDay===S.day)return 'Pastkastīte tukša.';S.mailDay=S.day;if(rnd()<.3){C().money+=20;return 'Atrasts kupons: +20 €'}return pick(['Reklāmas buklets.','Rēķins par elektrību (jau samaksāts).','Vēstule no vecmāmiņas!'])})],
-  elevator:b=>{const res=residentsOf(b),h=hourNow();return res.length?res.map(p=>I(`Uz ${p.first} dzīvokli`,relName(p),2,0,()=>{if(locOf(p,h)===b.id&&(p.close>=15||isFamily(p))){setTimeout(()=>doEnter(b,'flat',p.id),20);return `${p.first} atver durvis.`}return 'Neviens neatver.'})):[I('Braukt ar liftu','Tu nevienu šeit nepazīsti',2,0,()=>'Lifts aizved līdz augšai un atpakaļ.')]},
-  visit:b=>{const p=pById(S.where.owner);if(!p)return [];return [I(`Ciemoties pie ${p.first}`,'+draudzība, +prieks',60,0,()=>{compBoost(p,8,isFamily(p)?0:3);need('fun',6);if(isFamily(p))eat(30);return isFamily(p)?'Mājas vakariņas kā bērnībā!':'Jauks vakars ciemos.'}),
-    ...(['partner','spouse'].includes(p.rel)||p.rom>=60?[I('Palikt pa nakti','Diena beidzas',0,0,()=>{compBoost(p,4,8);setTimeout(()=>endDay('friend'),30);return 'Labu nakti.'})]:[])]},
-  visitBed:b=>ACT.visit(b),
-  bed:b=>{const c=C(),sp=S.people.find(p=>['spouse','partner'].includes(p.rel)&&p.alive&&(p.livesWith||p.rel==='spouse'||p.id===S.comp));
-    return [I('Gulēt','Diena beidzas, paiet mēnesis',0,0,()=>{setTimeout(()=>endDay('home'),30);return 'Labu nakti!'}),I('Pasnaust','+enerģija',60,0,()=>{need('energy',18);return 'Īss miegs palīdz.'}),
-      ...(sp?[I('Plānot bērnu',`kopā ar ${sp.first}`,60,0,()=>{const fa=c.sex==='f'?ageOf(c.bT):sp.sex==='f'?ageOf(sp.bT):40;if(fa>46)return 'Vecums vairs neļauj.';compBoost(sp,4,6);
-        if(rnd()<.42){const kid=mkPerson({rel:'child',surIdx:c.surIdx,bT:S.T,close:80,phone:false,met:1,stats:rollStats(Math.min(15,S.prestige/6),c.stats)});kid.homeB=HOMES[c.home].b;S.people.push(kid);genSched(kid);addStat('happy',12);log(`Piedzimst tavs ${kid.sex==='m'?'dēls':'meita'} ${kid.first}!`,'g');checkTrophies();return `Ģimenē ienāk ${kid.first}!`}return 'Šoreiz neizdevās.'})]:[])]},
+  shopCounter:b=>[],
+  gifts:b=>[M_('Dāvanu nodaļa','Šokolāde, lāči, rotas…',()=>giftShop(['sokolade','lacis','vins','rota','zurnals'])),M_('Mājai: mēbeles un tehnika','Komforts un popularitāte',()=>furnShop())],
+  perfume:b=>[I('Smaržas','Dāvana · patīk modes mīļotājiem',5,85,()=>{addInv('smarzas');return 'Smaržas somā.'})],
+  jewel:b=>[I('Zelta kaklarota','Dāvana · ļoti romantiska',5,400,()=>{addInv('rota');return 'Mirdz!'})],
+  hair:b=>[M_('Frizūra','Mainīt matus',()=>hairModal())],
+  salon:b=>[act('Manikīrs',45,40,{beauty:3},'',null,'Nevainojami nagi.'),act('Sejas procedūra',60,90,{beauty:5},'',null,'Āda mirdz.'),M_('Frizūra','Mainīt matus',()=>hairModal())],
+  tan:b=>[act('Iedegums solārijā',20,30,{beauty:3},'',null,'Tu izskaties pēc Maiami!')],
+  flowers:b=>[I('Rožu pušķis','Dāvana · romantiska',5,25,()=>{addInv('ziedi');return 'Rozes ietītas papīrā.'}),I('Plīša lācītis','Dāvana',5,18,()=>{addInv('lacis');return 'Mīksts lācītis.'}),I('Šokolādes konfektes','Dāvana',5,12,()=>{addInv('sokolade');return 'Konfektes somā.'})],
+  art:b=>[act('Apskatīt izstādi',90,25,{culture:6},'',null,'Van Gogs, Monē, Rembrants…'),...withComp('Muzejs kopā','+draudzība',90,50,p=>{addSt('culture',5);bond(p,8,5);return 'Jūs apspriežat impresionistus.'})],
+  museumDesk:b=>[act('Gida ekskursija',120,40,{culture:9},'',null,'Gids zina visu par ēģiptiešu kapenēm.')],
+  police:b=>{const c=C();return [I('Samaksāt sodu par pārkāpumiem','−10 noziedzīgums',20,100,()=>{addSt('crime',-10);return 'Tava kartīte ir tīrāka.'},c.st.crime<5?'Tev nav pārkāpumu':null)]},
+  jazzStage:b=>[act('Klausīties džeza grupu',60,20,{culture:3,humor:2},'',null,'Saksofons raud.')],
+  jazzTable:b=>[...ACT.jazzStage(b),...withComp('Džezs divatā','+romantika',60,40,p=>{bond(p,6,9);return 'Lēna melodija tikai jums.'})],
+  mail:b=>[I('Pārbaudīt pastkastīti','',2,0,()=>{if(S.mailDay===S.day)return 'Pastkastīte tukša.';S.mailDay=S.day;if(rnd()<.3){C().money+=20;return 'Atrasts kupons: +$20'}return pick(['Reklāmas buklets.','Rēķins par elektrību (Edgars samaksāja).','Vēstule no mammas Latvijā!'])})],
+  elevator:b=>{const h=hourNow(),res=S.people.filter(p=>p.homeB===b.id&&p.met);return res.length?res.map(p=>I(`Uz ${nGen(p.first)} dzīvokli`,relLabel(p),2,0,()=>{if(locOf(p,h)===b.id&&(p.f>=35||p.steady)){setTimeout(()=>doEnter(b,'flat',p.id),20);return `${p.first} atver durvis.`}return 'Neviens neatver.'})):[I('Braukt ar liftu','Tu nevienu šeit nepazīsti',2,0,()=>'Lifts aizved līdz augšai un atpakaļ.')]},
+  visit:b=>{const p=pById(S.where.owner);if(!p)return [];return [I(`Ciemoties pie ${nGen(p.first)}`,'+draudzība',60,0,()=>{bond(p,8,3);return 'Jauks vakars ciemos.'}),
+    ...(p.steady||p.rom>=80?[I('Palikt pa nakti','Diena beidzas · +romantika',0,0,()=>{bond(p,4,10);setTimeout(()=>endDay('friend'),30);return 'Labu nakti.'},hourNow()<20?'Pēc 20:00':null)]:[])]},
+  bed:b=>{const sp=compP();return [I('Gulēt līdz rītam','Diena beidzas',0,0,()=>{setTimeout(()=>endDay('home'),30);return 'Labu nakti!'},hourNow()<19&&C().needs.energy>30?'Vēl par agru (pēc 19:00 vai ja ļoti noguris)':null),I('Pasnaust','+20 miegs',60,0,()=>{need('energy',20);return 'Īss miegs palīdz.'}),
+    ...(sp&&(sp.steady||sp.rom>=80)?[I(`Romantisks vakars ar ${nAcc(sp.first)}`,'+romantika · diena beidzas',60,0,()=>{bond(sp,5,14);setTimeout(()=>endDay('home'),30);return 'Svečes, mūzika…'},hourNow()<20?'Pēc 20:00':null)]:[])]},
   wardrobe:b=>[M_('Pārģērbties','Garderobe',()=>wardrobeModal())],
-  fridge:b=>{const c=C();return [I('Ēst','+sāta',20,0,()=>{c.fridge--;eat(45,2);return 'Mājas maltīte.'},c.fridge<=0?'Ledusskapis tukšs — iepērcies lielveikalā':null),...withComp('Pagatavot vakariņas','+romantika',60,0,p=>{c.fridge-=2;eat(50,6);compBoost(p,8,10);return 'Svecītes un mājas vakariņas.'},c.fridge<2?'Vajag 2 maltītes':null)]},
-  homeSofa:b=>[I('Atpūsties','+enerģija, +prieks',40,0,()=>{need('energy',10);need('fun',5);return 'Tu atslābsti.'}),...withComp('Apskāvieni uz dīvāna','+romantika',30,0,p=>{compBoost(p,5,10);return 'Silti un mājīgi.'})],
-  homeTv:b=>[I('Skatīties TV','+prieks',60,0,()=>{need('fun',12+homeComfort().fun/3);return pick(['Ziņas: '+S.country.pm+' runā par budžetu.','Seriāls „Ostmalas noslēpumi”.','Futbola spēle!'])})],
-  homeConsole:b=>[I('Spēlēt videospēles','+prieks',60,0,()=>{need('fun',16);return 'Vēl tikai viens līmenis…'}),...withComp('Spēlēt kopā','+draudzība',60,0,p=>{compBoost(p,8,2);need('fun',14);return 'Kurš uzvarēja? Strīdīgi.'})],
-  homeStereo:b=>[I('Klausīties mūziku','+prieks',30,0,()=>{need('fun',8);return 'Mīļākā playlist.'}),...withComp('Lēnā deja','+romantika',20,0,p=>{compBoost(p,4,10);return 'Jūs dejojat istabas vidū.'})],
-  homeAqua:b=>[I('Vērot zivtiņas','+laime',15,0,()=>{addStat('happy',2);need('fun',3);return 'Nomierinoši.'})],
-  homeDesk:b=>{const c=C(),j=jobDef(),remote=j&&['dev','analyst','journo'].includes(j.id);return [I('Rakstīt blogu','+slava, +ietekme',60,0,()=>{if(rnd()<.3+c.stats.smarts/150){addRep(1);addInf(1);return 'Ieraksts kļūst populārs!'}return 'Daži lasītāji.'}),I('Lasīt ziņas','+gudrība',20,0,()=>{addStat('smarts',1);return `Valdības reitings: ${approval()}%.`}),
-    ...(remote?[I('Strādāt no mājām','Darba maiņa',240,0,()=>workShift(j),c.job.worked?'Šodien jau strādāts':null)]:[]),M_('Darba sludinājumi','Visas vakances',()=>allJobsModal())]},
-  swim:b=>[I('Peldēt baseinā','+prieks, +veselība',40,0,()=>{need('fun',10);addStat('health',2);return 'Atsvaidzinoši!'})],
-  fountain:o=>[I('Iemest monētu','Ievēlēties…',2,1,()=>{if(rnd()<.15){C().money+=50;return 'Tu atrodi 50 € pie strūklakas malas!'}need('fun',2);return 'Vēlēšanās ir izteikta.'})],
-  bench:o=>[I('Atpūsties','+enerģija',20,0,()=>{need('energy',6);return 'Tu vēro garāmgājējus.'})],
-  lounger:o=>[I('Sauļoties','+prieks, +izskats',60,0,()=>{need('fun',8);addStat('looks',.5);addStat('happy',2);return 'Saule silda.'},hourNow()>=20||hourNow()<9?'Saule nespīd':null),I('Peldēt jūrā','+veselība, +prieks',40,0,()=>{addStat('health',3);need('fun',8);return 'Viļņi ir vēsi un spirgti.'}),...withComp('Pastaiga gar jūru','+romantika',40,0,p=>{compBoost(p,6,10);return 'Saulriets pār jūru.'})],
-  cart:o=>[I({hotdog:'Hotdogs',smoothie:'Smūtijs',icecart:'Saldējums'}[o.kind],'+sāta',5,o.kind==='hotdog'?4:3,()=>{eat(o.kind==='hotdog'?30:12,4);if(o.kind==='smoothie')need('energy',8);return 'Gardi!'})],
-  taxi:o=>TAXIS.filter(t=>t.x!==o.x||t.y!==o.y).map(t=>I(`Uz: ${t.n}`,'Taksometrs',10,12,()=>{P.x=t.x+.5;P.y=t.y+.5;P.path=[];cam.init=false;spawnCity();return `Taksometrs aizved tevi: ${t.n}.`})).concat([I('Uz mājām','Taksometrs',10,15,()=>{const b=bld(HOMES[C().home].b);P.x=b.door[0]+.5;P.y=b.door[1]+.5;cam.init=false;spawnCity();return 'Esi pie mājām.'})])
+  fridge:b=>{const c=C();return [I('Ēst','+45 sāta',20,0,()=>{c.fridge--;eat(45);return 'Mājas maltīte.'},c.fridge<=0?'Ledusskapis tukšs — iepērcies bodegā':null),...withComp('Pagatavot vakariņas','+romantika',60,0,p=>{c.fridge-=2;eat(50);bond(p,8,10);return 'Svecītes un mājas vakariņas.'},c.fridge<2?'Vajag 2 maltītes':null)]},
+  dumbbell:b=>[act('Trenēties ar hantelēm',30,0,{strength:2},'−8 higiēna, −8 miegs',C().needs.energy<12?'Pārāk noguris':null,()=>{need('hygiene',-8);need('energy',-8);return 'Viens, divi, trīs…'})],
+  homeSofa:b=>[I('Atpūsties','+10 miegs',30,0,()=>{need('energy',10);return 'Tu atslābsti.'}),...withComp('Apskāvieni uz dīvāna','+romantika',30,0,p=>{bond(p,4,10);return 'Silti un mājīgi.'})],
+  homeTv:b=>[act('Skatīties ziņas',30,0,{culture:2},'',null,'Mērs sola labot metro.'),act('Skatīties komēdiju šovu',30,0,{humor:2},'',null,'Hahaha!')],
+  homeConsole:b=>[act('Spēlēt videospēles',60,0,{humor:night()?4:2},night()?'vēlā nakts':'',null,'Vēl tikai viens līmenis…'),...withComp('Spēlēt kopā','+draudzība',60,0,p=>{bond(p,8,2);return 'Jautri!'})],
+  homeStereo:b=>[act('Klausīties mūziku',30,0,{humor:1,culture:1},'',null,'Mīļākā dziesma.'),...withComp('Lēnā deja','+romantika',20,0,p=>{bond(p,4,10);return 'Jūs dejojat istabas vidū.'})],
+  homeAqua:b=>[I('Vērot zivtiņas','+5 miegs',15,0,()=>{need('energy',5);return 'Nomierinoši.'})],
+  homeDesk:b=>[act('Lasīt grāmatu',60,0,{culture:3},'',null,'Hemingvejs.'),...(C().inv.avize?[act('Lasīt avīzi',20,0,{culture:2},'',null,()=>{C().inv.avize--;return 'Biržā atkal svārstības.'})]:[])],
+  piano:b=>[act('Spēlēt klavieres',30,0,{culture:2,humor:1},'',null,'Skaista melodija.')],
+  swim:b=>[act('Peldēt baseinā',40,0,{health:3},'+higiēna',null,()=>{need('hygiene',30);return 'Atsvaidzinoši!'})],
+  fountain:o=>[I('Iemest monētu','Ievēlēties…',2,1,()=>{if(rnd()<.15){C().money+=20;return 'Tu atrodi $20 pie strūklakas malas!'}return 'Vēlēšanās ir izteikta.'})],
+  bench:o=>[I('Atpūsties','+8 miegs',20,0,()=>{need('energy',8);return 'Tu vēro garāmgājējus.'}),I('Gulēt uz soliņa','Diena beidzas (slikti)',0,0,()=>{setTimeout(()=>endDay('bench'),30);return 'Zvaigznes virs Ņujorkas…'},hourNow()<21?'Pēc 21:00':null)],
+  cart:o=>[I('Hotdogs','+25 sāta · $3',5,3,()=>{eat(25);return 'Ar sinepēm un sīpoliem!'}),I('Hotdogs līdzņemšanai','Somā',2,3,()=>{addInv('hotdog');return 'Hotdogs somā. Varbūt kāds izsalcis?'})],
+  chess:o=>[act('Spēlēt šahu ar vecīšiem',45,0,{culture:4},'',null,()=>rnd()<.4?'Šahs un mats! Tu uzvarēji.':'Vecītis tevi sagrāva 12 gājienos.')],
+  picnic:o=>[...(compP()?withComp('Pikniks','+romantika',60,15,p=>{eat(25);bond(p,8,10);return 'Sviestmaizes zālē un saule.'}):[act('Pikniks vienatnē',45,8,{humor:1},'+25 sāta',null,()=>{eat(25);return 'Vāveres tev ziņkārīgi skatās.'})])],
+  carriage:o=>[act('Pajūga brauciens pa parku',45,60,{culture:2,beauty:1},'',null,'Zirgu pakavi klaudz pa taku.'),...withComp('Pajūgs divatā','+romantika',45,80,p=>{bond(p,8,14);return 'Ļoti romantiski!'})],
+  carousel:o=>[act('Izbraukt ar karuseli',15,3,{humor:3},'',null,'Ūū!')],
+  jog:o=>[act('Skriet pa parka taku',45,0,{health:3},'−12 higiēna, −10 miegs',C().needs.energy<15?'Pārāk noguris':null,()=>{need('hygiene',-12);need('energy',-10);return 'Centrālparks ir skaists.'})],
+  news:o=>[I('Avīze','Somā · $1',1,1,()=>{addInv('avize');return 'Avīze somā.'}),I('Žurnāls „Laiks”','Dāvana · $6',1,6,()=>{addInv('zurnals');return 'Žurnāls somā.'})],
+  bull:o=>[I('Paberzēt vērša degunu veiksmei','Volstrītas tradīcija',5,0,()=>{if(S.bullDay===S.day)return 'Vērsis šodien jau devis veiksmi.';S.bullDay=S.day;if(rnd()<.35){C().money+=25;return 'Veiksme! Tu atrodi $25.'}addFame(.5);return 'Tūristi tevi fotografē.'})],
+  steps:o=>[act('Vērot Taimskvēru',30,0,{culture:2,humor:2},'',null,'Miljoniem gaismu un cilvēku.')],
+  subway:o=>STATIONS.filter(s=>s!==o).map(s=>I(`Uz: ${s.n}`,DISTS[s.d].n,12,3,()=>{travelTo(s.x,s.y);return `Metro aizved tevi: ${DISTS[s.d].n}.`})),
+  taxi:o=>Object.keys(DISTS).map(d=>{const s=STATIONS.find(x=>x.d===d),dist=Math.abs(s.x-o.x)+Math.abs(s.y-o.y),fare=Math.round(5+dist*.35);return I(`Uz: ${DISTS[d].n}`,'Dzeltenais taksometrs',Math.round(6+dist*.2),fare,()=>{travelTo(s.x,s.y);return `Taksometrs aizved tevi: ${DISTS[d].n}.`})}).concat([I('Uz mājām','Taksometrs',12,Math.round(5+Math.abs(bld(HOMES[C().home].b).door[0]-o.x)*.35+Math.abs(bld(HOMES[C().home].b).door[1]-o.y)*.35),()=>{const b=bld(HOMES[C().home].b);travelTo(b.door[0],b.door[1]);return 'Esi pie mājām.'})])
 };
-function addInv(k){const i=C().inv;i[k]=(i[k]||0)+1}
-function bankItems(){const c=C();return [I('Noguldīt 1000 €','0,3% mēnesī',5,1000,()=>{c.savings+=1000;return 'Nauda noguldīta.'}),I('Izņemt noguldījumu',`Noguldīts ${eur(c.savings)}`,5,0,()=>{const v=c.savings;c.money+=v;c.savings=0;return `Izņemti ${eur(v)}.`},c.savings<=0?'Nav noguldījuma':null),
-  I('Ņemt kredītu 10 000 €','~11% gadā',10,0,()=>{c.money+=10000;c.debt+=10000;return 'Kredīts piešķirts.'},c.debt>60000?'Banka atsaka':null),I('Atmaksāt kredītu',`Parāds ${eur(c.debt)}`,5,0,()=>{const v=Math.min(c.debt,Math.max(0,c.money));c.money-=v;c.debt-=v;return `Atmaksāti ${eur(v)}.`},c.debt<=0?'Nav parāda':c.money<=0?'Nav naudas':null)]}
-function bizItems(){const c=C();if(!c.biz)return [I('Dibināt uzņēmumu','Ieguldījums',60,12000,()=>{c.biz={n:pick(['Baltā Osta','Dzintara loģistika','Ostmala Digital','Jūras Garša','Ziemeļu būve']),val:12000};addInf(2);return `Dibināts uzņēmums „${c.biz.n}”.`})];
-  return [I('Paplašināt uzņēmumu',`Vērtība ${eur(c.biz.val)}`,120,Math.round(c.biz.val*.3),()=>{const ok=rnd()<.7+c.stats.smarts/400;c.biz.val=Math.round(c.biz.val*(ok?1.45:1.05));addInf(ok?3:0);return ok?'Uzņēmums aug!':'Pieaugums neliels.'}),I('Pārdot uzņēmumu','Saņem tirgus vērtību',30,0,()=>{const v=c.biz.val;c.money+=v;c.biz=null;return `Uzņēmums pārdots par ${eur(v)}.`})]}
-function partyItems(){const c=C();if(!c.party)return [M_('Iestāties partijā','Izvēlies ideoloģiju',()=>partyModal()),M_('Dibināt savu partiju','15 000 € · ietekme 35',()=>foundParty(),c.inf<35?'Vajag ietekmi 35':null)];
-  const P_=party(c.party);const out=[I('Brīvprātīgais darbs',`Partijas atbalsts ${Math.round(c.standing)}/100`,120,0,()=>{c.standing=cl(c.standing+5);addInf(2);return `${P_.sh} biedri novērtē tavu darbu.`}),I('Ziedot partijai','+partijas atbalsts',5,2000,()=>{c.standing=cl(c.standing+8);return 'Partijas kase ir pateicīga.'})];
-  if(c.rank<3)out.push(I('Kandidēt uz priekšsēdētāju','Partijas kongress',180,0,()=>{if(rnd()<(c.standing-40)/60+c.inf/300){c.rank=3;addInf(6);log(`Tu kļūsti par partijas „${P_.n}” priekšsēdētāju!`,'g');return 'Kongress tevi ievēl!'}c.standing=cl(c.standing-10);return 'Kongress izvēlas citu.'},c.rank<2?'Vajag būt valdes loceklim':c.inf<45?'Vajag ietekmi 45':null));
-  out.push(I('Izstāties no partijas','',5,0,()=>{if(c.party==='own')return 'Tu nevari pamest paša dibināto partiju.';c.party=null;c.standing=0;c.rank=0;c.cand=null;c.campaign=0;return 'Tu izstājies no partijas.'}));return out}
-function objTitle(o){const b=S.where?bld(S.where.b):null;const n={tree:'Koks',bench:'Soliņš',lounger:'Pludmale',cart:'Kiosks',atm:'Bankomāts',taxi:'Taksometru pietura',fountain:'Strūklaka'}[o.k];if(n)return n;
-  return {counter:'Lete',bar:'Bārs',table:'Galdiņš',table4:'Galds',dance:'Deju grīda',dj:'DJ pults',rack:'Apģērbi',mirror:'Spogulis',bed:'Gulta',fridge:'Ledusskapis',wardrobe:'Skapis',sofa:'Dīvāns',tvstand:'Televizors',desk:'Galds',seats:'Sēdvietas',podium:'Tribīne',bookshelf:'Grāmatplaukts',slot:'Spēļu automāts',roulette:'Rulete',treadmill:'Skrejceliņš',weights:'Svari',salonchair:'Friziera krēsls',shelf:'Plaukts',crates:'Kastes',teller:'Kase',atmI:'Bankomāts'}[o.k]||(b?b.n:'')}
+function travelTo(x,y){if(S.where){S.where=null;ROOM=null}const t=walkCity(x,y)?[x,y]:(adjFree(CITY,x,y)||[x,y]);P.x=t[0]+.5;P.y=t[1]+.5;P.path=[];P.target=null;cam.init=false;spawnCity()}
+function momLock(){return S.momDay!=null&&S.day-S.momDay<10?`Nākamreiz pēc ${10-(S.day-S.momDay)} d.`:null}
+function momMoney(){S.momDay=S.day;C().mom=(C().mom||0)+1;C().money+=150;return C().mom>2?'Mamma sūta $150, bet nopūšas: „Kad tu sāksi pelnīt pats?”':'Mamma atsūta $150: „Ēd kārtīgi, dēliņ/meitiņ!”'}
+function freeDance(b,partner){if(!spendT(30,0))return;startMinigame('dance',0,r=>{addSt('humor',1+Math.round(r*2));need('energy',-8);need('hygiene',-6);addFame(r*1.5);let msg=`Deja: ${Math.round(r*100)}%.`;
+  if(partner){bond(partner,4+r*8,4+r*12);msg+=` ${partner.first} ir sajūsmā!`}
+  NPCS.forEach(n=>{const p=pById(n.pid);if(p&&p.met&&r>.7&&Math.hypot(n.x-P.x,n.y-P.y)<3){p.f=cl(p.f+3,0,FMAX);bubble(n,'Forši dejo!')}});log(msg,'g');toast(msg);checkTrophies();refreshUI();save()},partner?'Deja ar '+partner.first:'Deju grīda')}
+function objTitle(o){const b=S.where?bld(S.where.b):null;const n={tree:'Koks',bench:'Soliņš',cart:'Hotdogu ratiņi',taxi:'Taksometru pietura',fountain:'Betesdas strūklaka',subway:o.n?'Metro: '+o.n:'Metro',chess:'Šaha galdiņš',picnic:'Pikniks',carriage:'Zirgu pajūgs',carousel:'Karuselis',jog:'Skriešanas taka',news:'Avīžu kiosks',bull:'Volstrītas vērsis',steps:'Sarkanās kāpnes'}[o.k];if(n)return n;
+  return {counter:'Lete',bar:'Bārs',table:'Galdiņš',table4:'Galds',dance:'Deju grīda',dj:'DJ pults',rack:'Apģērbi',mirror:'Spogulis',bed:'Gulta',fridge:'Ledusskapis',wardrobe:'Skapis',sofa:'Dīvāns',tvstand:'Televizors',desk:'Galds',seats:'Sēdvietas',stage:'Skatuve',shelf:'Plaukts',treadmill:'Skrejceliņš',weights:'Svari',salonchair:'Friziera krēsls',teller:'Kase',atmI:'Bankomāts',toilet:'Tualete',shower:'Duša',arcadem:'Spēļu automāts',telescope:'Teleskops',dummy:'Kung-fu manekens',massagebed:'Masāžas galds',tradedesk:'Tirdzniecības galds',stall:'Tirgus stends',dumbbell:'Hanteles',pool:'Biljards',hbed:'Solārijs',mat:'Paklājiņš',pedestal:'Eksponāts',flowerstand:'Ziedi',stereo:'Atskaņotājs',piano:'Klavieres',mailbox:'Pastkastītes',elevator:'Lifts',swim:'Baseins'}[o.k]||(b?b.n:'')}
 function openObj(o){
   const b=S.where?bld(S.where.b):null,f=ACT[o.act];if(!f)return;
   const list=f(b||o);if(!list.length){toast('Šeit nav ko darīt.');return}
   listModal(objTitle(o),list,()=>openObj(o),b?b.n:null);
 }
 function listModal(title,list,reopen,sub){
-  modal({t:title,sub:(sub?sub+' · ':'')+clockStr(),ch:list.map(it=>({l:it.l,s:[it.s,it.t?`${it.t>=60?(it.t/60).toFixed(it.t%60?1:0)+' h':it.t+' min'}`:'',it.cost?eur(it.cost):''].filter(Boolean).join(' · '),why:it.lock,dis:!!it.lock,fn:()=>{
+  modal({t:title,sub:(sub?sub+' · ':'')+clockStr(),ch:list.map(it=>({l:it.l,s:[it.s,it.t?`${it.t>=60?(it.t/60).toFixed(it.t%60?1:0)+' h':it.t+' min'}`:'',it.cost?usd(it.cost):''].filter(Boolean).join(' · '),why:it.lock,dis:!!it.lock,fn:()=>{
     if(it.m){it.fn();return}
     if(!spendT(it.t||0,it.cost||0)){if(reopen)reopen();return}
-    const msg=it.fn();if(msg){log(msg);toast(msg)}checkTrophies();refreshUI();save();
-    if(reopen&&!S.dead&&!C().jail&&!it.close&&S.where!==undefined)setTimeout(()=>{if(!$('#modalRoot').innerHTML&&S.min<DAY_MIN)reopen()},10);
+    const msg=it.fn();if(msg){log(msg);toast(msg)}checkTrophies();if(typeof storyHour==='function')storyHour();refreshUI();save();
+    if(reopen&&!S.over&&!it.close&&S.where!==undefined)setTimeout(()=>{if(!$('#modalRoot').innerHTML&&!MG_ON&&S.min<DAY_MIN)reopen()},10);
   }})).concat([{l:'Aizvērt',exit:true}])});
 }
 
 /* ---------- Sarunas ---------- */
-function bubble(n,t){n.bub=t;n.bubT=2.4}
+function bubble(n,t){n.bub=t;n.bubT=2.6}
+function gateWhy(p){if(p.f>=35||p.fam)return null;
+  if(p.gate)for(const k in p.gate)if(stat(k)<p.gate[k])return `${p.first} tevi ignorē. (Vajag ${STN[k].toLowerCase()} ${p.gate[k]}, tev ${Math.floor(stat(k))}.)`;
+  if(p.gatePop&&popularity()<p.gatePop)return `${p.first} nerunā ar nepazīstamiem. (Vajag popularitāti ${p.gatePop}, tev ${popularity()}.)`;
+  if(p.gateMax)for(const k in p.gateMax)if(stat(k)>=p.gateMax[k])return `„Ar tādiem kā tu es nerunāju.” (Noziedzīgumam jābūt zem ${p.gateMax[k]}.)`;
+  return null}
 function socialMenu(n){
   const c=C(),p=pById(n.pid);if(!p){n.talking=false;return}
   const close=()=>{n.talking=false;n.hold=false};
-  const again=()=>{if(!S.dead&&!C().jail&&p.alive)socialMenu(n);else close()};
-  const mm=moodMul(),adult=ageOf(p.bT)>=18&&ageOf(c.bT)>=18,fam=isFamily(p);
-  const act=(l,s,mins,fn,lock)=>({l,s:s+(mins?` · ${mins} min`:''),dis:!!lock,why:lock,fn:()=>{if(!spendT(mins,0)){close();return}const r=fn();if(r){toast(r.msg);if(r.b)bubble(n,r.b)}checkTrophies();renderHUD();save();again()}});
-  const ch=[];
-  if(p.rel==='none'){
+  const again=()=>{if(!S.over)socialMenu(n);else close()};
+  const mul=socialMul();
+  const A=(l,s,mins,fn,lock)=>({l,s:s+(mins?` · ${mins} min`:''),dis:!!lock,why:lock,fn:()=>{if(!spendT(mins,0)){close();return}const r=fn();if(r){if(r.msg)toast(r.msg);if(r.b)bubble(n,r.b)}p.lastSeen=S.day;checkTrophies();if(typeof storyHour==='function')storyHour();renderHUD();save();if(r&&r.stop){close();return}again()}});
+  const ch=[],gw=gateWhy(p);
+  (typeof storyOptions==='function'?storyOptions(p,n):[]).forEach(o=>ch.push(o));
+  if(p.appt&&p.appt.date&&p.appt.day===S.day&&S.where&&S.where.b===p.appt.b){const d=DATES.find(x=>x.id===p.appt.date);ch.unshift({l:`❤ Sākt randiņu: ${d.n}`,s:`${usd(d.p)} · 2 h`,fn:()=>{doDate(p,d,n)}})}
+  if(!p.met){
     ch.push({hdr:'Iepazīšanās'});
-    ch.push(act('Iepazīties','Sasveicināties un pajautāt vārdu',10,()=>{if(rnd()<(.55+c.stats.charm/200+c.stats.looks/400+c.rep/300)*mm){p.rel='acq';p.met=1;p.close=cl(15+Math.round(c.stats.charm/6));log(`Tu iepazīsties ar ${fullName(p)}.`);return {msg:`Prieks iepazīties, ${p.first}!`,b:'Sveiks!'}}return {msg:'Garāmgājējs steidzas tālāk.',b:'Nav laika…'}}));
-    if(c.cand)ch.push(act('Lūgt balsi','Kampaņa uz ielas',10,()=>{if(p.pref===c.party||rnd()<c.stats.charm/160*mm){c.campaign+=2;return {msg:'Apsola balsot par tevi!',b:'Balsošu!'}}return {msg:'„Es neticu politiķiem.”',b:'Hmm…'}}));
+    ch.push(A('Sasveicināties un iepazīties','Pajautāt vārdu',10,()=>{if(gw)return {msg:gw,b:'Hmpf.'};
+      if(p.cast||rnd()<(.55+stat('beauty')/200+c.st.humor/300+popularity()/250)*mul){p.met=1;p.f=Math.max(p.f,5);log(`Tu iepazīsties: ${fullName(p)} (${p.role||'ņujorkietis'}).`);return {msg:`Prieks iepazīties, ${p.first}!`,b:'Sveiks!'}}
+      return {msg:'Garāmgājējs steidzas tālāk.',b:'Nav laika…'}}));
+  } else if(gw){
+    ch.push({hdr:'Saruna'});ch.push(A('Mēģināt parunāt','',5,()=>({msg:gw,b:pick(['…','Hmpf.','Nē, paldies.'])})));
   } else {
-    ch.push({hdr:'Draudzīgi'});
-    ch.push({l:'Runāt par…',s:'Izvēlies tēmu · 15 min',fn:()=>topicMenu(n,p)});
-    ch.push(act('Pajokot','Harizma',10,()=>{if(rnd()<(.3+c.stats.charm/120)*mm){p.close=cl(p.close+7);return {msg:`${p.first} smejas.`,b:'Hahaha!'}}p.close=cl(p.close-4);return {msg:'Joks nenostrādā.',b:'…'}}));
-    ch.push(act('Izteikt komplimentu','Stils + harizma',10,()=>{if(rnd()<(.3+(c.stats.charm+styleScore())/220)*mm){p.close=cl(p.close+6);return {msg:`${p.first} ir glaimots.`,b:'Ak, paldies!'}}p.close=cl(p.close-3);return {msg:'Tas izklausījās dīvaini.',b:'Ēē…'}}));
-    ch.push(act('Apskaut','',5,()=>{if(p.close>=35||fam){p.close=cl(p.close+5);return {msg:'Silts apskāviens.',b:'♥'}}p.close=cl(p.close-6);return {msg:`${p.first} atkāpjas.`,b:'Ē…'}},p.close<20&&!fam?'Vajag draudzību 20':null));
-    if(!p.phone)ch.push(act('Lūgt telefona numuru','',5,()=>{if(p.close>=25&&rnd()<.7*mm+.2){p.phone=true;return {msg:`${p.first} iedod numuru!`,b:'Piezvani!'}}return {msg:'„Varbūt kādreiz.”',b:'Hmm.'}},p.close<15?'Vajag draudzību 15':null));
-    if(!fam&&adult){
-      ch.push({hdr:'Romantiski'});
-      if(!['spouse'].includes(p.rel))ch.push(act('Flirtēt','Izskats + stils',10,()=>{if(rnd()<(.2+c.stats.looks/180+styleScore()/180+p.close/350)*mm){p.rom=cl(p.rom+9);return {msg:`${p.first} sarkst.`,b:'❤'}}p.rom=cl(p.rom-4);p.close=cl(p.close-2);return {msg:'Neveikls brīdis.',b:'Nu…'}}));
-      ch.push(act('Noskūpstīt','',5,()=>{if(p.rom>=45&&rnd()<.75*mm+.15){p.rom=cl(p.rom+10);c.flags.kiss=true;return {msg:'Skūpsts!',b:'❤❤'}}p.rom=cl(p.rom-10);p.close=cl(p.close-6);return {msg:`${p.first} novēršas.`,b:'Ei!'}},p.rom<30?'Vajag romantiku 30':null));
-      if(['acq','friend','ex'].includes(p.rel)&&!S.people.some(x=>['partner','spouse'].includes(x.rel)&&x.alive))ch.push(act('Piedāvāt attiecības','',10,()=>{if(p.rom>=55&&rnd()<p.rom/100+.1){p.rel='partner';c.flags.partner=true;addStat('happy',10);log(`Tu un ${p.first} esat pāris!`,'g');return {msg:'Jā! Jūs esat pāris!',b:'❤❤❤'}}p.rom=cl(p.rom-8);return {msg:`${p.first} grib vēl pagaidīt.`,b:'Varbūt vēlāk…'}},p.rom<45?'Vajag romantiku 45':null));
-      if(p.rel==='partner'){ch.push(act('Bildināt','Vajag gredzenu',10,()=>{if(!c.inv.gredzens)return {msg:'Tev vajag saderināšanās gredzenu (Tirdzniecības centrā).'};c.inv.gredzens--;if(rnd()<p.rom/100+.1){p.rel='spouse';p.livesWith=1;c.flags.married=true;addStat('happy',15);log(`Kāzas ar ${fullName(p)}!`,'g');return {msg:'JĀ! Kāzas pie jūras!',b:'❤❤❤'}}p.rom=cl(p.rom-10);return {msg:'„Vēl neesmu gatavs/-a.”',b:'…'}},p.rom<70?'Vajag romantiku 70':null));
-        if(!p.livesWith)ch.push(act('Aicināt dzīvot kopā','',10,()=>{if(p.rom>=60){p.livesWith=1;return {msg:`${p.first} pārvācas pie tevis!`,b:'Jā!'}}return {msg:'Vēl par agru.',b:'Hmm.'}},c.home===0?'Vispirms vajag savu mājokli':null))}
-      if(['partner','spouse'].includes(p.rel))ch.push(act(p.rel==='spouse'?'Šķirties':'Izšķirties','',10,()=>{if(p.rel==='spouse')c.money=Math.round(c.money*.7);p.rel='ex';p.livesWith=0;p.rom=cl(p.rom-40);addStat('happy',-10);if(S.comp===p.id)dismissComp(true);return {msg:'Attiecības beidzas.',b:'…'}}));
+    ch.push({hdr:'Saruna'});
+    ch.push({l:'Runāt par…',s:'Izvēlies tēmu · 30 min',fn:()=>topicMenu(n,p)});
+    if(!p.tDay._ask)ch.push(A('Pajautāt par sevi','Uzzināt, kas patīk · reizi dienā',15,()=>{p.tDay._ask=1;const un=p.likes.concat(p.dislikes).filter(t=>!p.known[t]);if(!un.length)return {msg:`Tu jau zini visu par ${nGen(p.first)} interesēm.`,b:'Tu mani pazīsti!'};const t=pick(un);p.known[t]=1;const like=p.likes.includes(t);bond(p,2,0);return {msg:`${p.first} ${like?'dievina':'nevar ciest'}: ${t}.`,b:like?`Es dievinu ${t.toLowerCase()}!`:`${t}? Fū!`}}));
+    ch.push({l:'Jokot…',s:'Asprātīgs, rupjš vai palaidnība',fn:()=>jokeMenu(n,p)});
+    if(p.f>=35)ch.push(A('Tenkot','Pastāstīt jaunumus par citiem',20,()=>{const others=S.people.filter(x=>x.met&&x!==p&&!x.fam);if(others.length<2)return {msg:'Tev vēl nav par ko tenkot.',b:'Nu?'};const t=pick(others);const g=p.gossip?R(9,13):R(2,5);bond(p,g,0);if(rnd()<.2){t.f=cl(t.f-8,0,FMAX);log(`${t.first} uzzināja, ka tu par viņu tenkoji…`,'b')}return {msg:p.gossip?`${p.first} dievina tenkas par ${nAcc(t.first)}!`:`${p.first} klausās par ${nAcc(t.first)}.`,b:p.gossip?'Nevar būt!!!':'Mhm.'}}));
+    if(!p.phone)ch.push(A('Lūgt telefona numuru','',5,()=>{if(p.f>=15&&rnd()<.8*mul+.15){p.phone=1;return {msg:`${p.first} iedod numuru!`,b:'Piezvani!'}}return {msg:'„Varbūt kādreiz.”',b:'Hmm.'}},p.f<15?'Vajag draudzību 15':null));
+    if(!p.fam&&!p.noRom){
+      ch.push({hdr:'Romantika'});
+      ch.push(A('Flirtēt','Skaistums + humors',10,()=>{if(p.key==='cop'&&c.st.crime>=20)return {msg:'Roza tev nopietni paskatās: „Nemēģini.”',b:'Nē.'};if(rnd()<(.2+stat('beauty')/150+c.st.humor/400+p.f/400)*mul){bond(p,1,R(6,10));return {msg:`${p.first} nosarkst.`,b:'❤'}}p.rom=cl(p.rom-3,0,FMAX);p.f=cl(p.f-2,0,FMAX);return {msg:'Neveikls brīdis.',b:'Ēē…'}},p.f<50&&p.rom<20?'Vajag draudzību 50 (Čoms+)':null));
+      ch.push({l:'Aicināt uz randiņu',s:'Izvēlies vietu un laiku',dis:p.f<50&&p.rom<25,why:p.f<50&&p.rom<25?'Vajag draudzību 50 vai romantiku 25':null,fn:()=>dateMenu(n,p)});
+      if(p.steady||p.rom>=60)ch.push(A('Noskūpstīt','',5,()=>{if(rnd()<.85){bond(p,1,6);S.flags.kiss=1;return {msg:'Skūpsts!',b:'❤❤'}}p.rom=cl(p.rom-5,0,FMAX);return {msg:`${p.first} novēršas.`,b:'Ne šeit!'}}));
+      if(!p.steady&&!S.people.some(x=>x.steady))ch.push(A('Piedāvāt kļūt par pāri','Vajag 3 randiņus un romantiku 70',10,()=>{if((p.dates||0)>=3&&p.rom>=70){p.steady=1;addFame(3);log(`Tu un ${p.first} esat pāris!`,'g');if(typeof storySteady==='function')storySteady(p);return {msg:`Jā! ${p.first} tagad ir ${p.sex==='m'?'tavs puisis':'tava meitene'}!`,b:'❤❤❤'}}p.rom=cl(p.rom-6,0,FMAX);return {msg:`${p.first} grib vēl pagaidīt.`,b:'Varbūt vēlāk…'}},(p.dates||0)<3?`Randiņi: ${p.dates||0}/3`:p.rom<70?`Romantika ${Math.floor(p.rom)}/70`:null));
+      if(p.steady)ch.push(A('Izšķirties','',10,()=>{p.steady=0;p.rom=cl(p.rom-50,0,FMAX);p.f=cl(p.f-20,0,FMAX);if(S.comp===p.id)dismissComp(true);log(`Tu un ${p.first} izšķiraties.`,'b');return {msg:'Attiecības beidzas.',b:'…',stop:1}}));
     }
     ch.push({hdr:'Kopā'});
     if(S.comp===p.id)ch.push({l:'Atvadīties līdz nākamajai reizei',s:'Beigt kopā pavadīto laiku',fn:()=>{dismissComp();close()}});
-    else ch.push(act('Nāc man līdzi!','Pavadonis staigās tev līdzi',5,()=>{if(p.close>=30||p.rom>=25||fam){if(S.comp)dismissComp(true);setComp(p);return {msg:`${p.first} nāk tev līdzi.`,b:'Ejam!'}}return {msg:`${p.first} šobrīd nevar.`,b:'Piedod.'}},p.close<30&&p.rom<25&&!fam?'Vajag draudzību 30':null));
-    const gifts=Object.keys(c.inv).filter(k=>c.inv[k]>0&&ITEMS[k].gift);
+    else ch.push(A('Nāc man līdzi!','Pavadonis staigās tev līdzi',5,()=>{if(p.f>=35||p.steady){if(S.comp)dismissComp(true);setComp(p);return {msg:`${p.first} nāk tev līdzi.`,b:'Ejam!'}}return {msg:`${p.first} šobrīd nevar.`,b:'Piedod.'}},p.f<35&&!p.steady&&!p.fam?'Vajag draudzību 35':null));
+    const gifts=Object.keys(c.inv).filter(k=>c.inv[k]>0&&(ITEMS[k].gift||(p.key==='sam'&&k==='hotdog')));
     if(gifts.length)ch.push({l:'Dāvināt…',s:gifts.map(k=>ITEMS[k].n).join(', '),fn:()=>giftMenu(n,p)});
-    ch.push({hdr:'Naidīgi'});
-    ch.push(act('Strīdēties','',10,()=>{p.close=cl(p.close-10);if(p.close<5&&!fam)p.enemy=true;addStat('happy',-2);return {msg:'Asa vārdu apmaiņa.',b:'Kā tu uzdrīksties?!'}}));
-    ch.push(act('Iepļaukāt','',5,()=>{p.close=cl(p.close-25);p.rom=cl(p.rom-30);addRep(-2);if(!fam)p.enemy=true;if(rnd()<.4){addStat('health',-6);return {msg:`${p.first} atbild ar dūri!`,b:'Saņem!'}}return {msg:'Pļauks!',b:'Au!'}}));
-    if(c.party){ch.push({hdr:'Politika'});
-      ch.push(act('Runāt par politiku',`Atbalsta: ${party(p.pref)?party(p.pref).sh:'—'}`,15,()=>{if(p.pref===c.party){p.close=cl(p.close+5);addRep(.5);return {msg:'Jūs esat vienisprātis!',b:'Piekrītu!'}}
-        if(rnd()<(c.stats.smarts/220+c.stats.charm/300)*mm){p.pref=c.party;p.close=cl(p.close+2);addInf(1);return {msg:`Tu pārliecini ${p.first}!`,b:'Varbūt tev taisnība.'}}p.close=cl(p.close-4);return {msg:'Strīds par politiku.',b:'Nepiekrītu!'}}));
-      if(p.pref===c.party&&!p.joined)ch.push(act('Aicināt iestāties partijā','+partijas atbalsts',15,()=>{p.joined=true;c.standing=cl(c.standing+5);addInf(1);return {msg:`${p.first} iestājas ${party(c.party).sh}!`,b:'Esmu iekšā!'}},p.close<50?'Vajag draudzību 50':null));
-      if(c.cand)ch.push(act('Lūgt balsi','Kampaņa',10,()=>{if(p.pref===c.party||rnd()<.3+p.close/150){c.campaign+=2+p.close/30;return {msg:'Apsola balsot par tevi!',b:'Protams!'}}return {msg:'Balsos par savējiem.',b:'Piedod.'}}));
-    }
+    const jb=p.key&&JOBS.find(j=>j.intro===p.key&&!S.flags['intro_'+j.id]);
+    if(jb)ch.push(A(`Palūgt ieteikumu darbam: ${jb.n}`,'Draudzība 35',10,()=>{if(jb.id==='trader'&&p.f<80)return {msg:`${p.first}: „Maklerim es ieteikšu tikai labu draugu.” (Vajag draudzību 80.)`,b:'Vēlāk.'};S.flags['intro_'+jb.id]=1;log(`${p.first} tevi ieteica: ${jb.n}.`,'g');return {msg:`${p.first} tevi ieteiks! Piesakies: ${bld(jb.b[0]).n}.`,b:'Pasaki, ka no manis!'}},p.f<35?'Vajag draudzību 35':null));
+    if(c.st.crime>=15&&!p.fam){ch.push({hdr:'Naidīgi'});ch.push(A('Iebiedēt','Spēks + noziedzīgums',10,()=>{addSt('crime',3);if(rnd()<.3+c.st.strength/150+c.st.crime/200){p.f=cl(p.f-15,0,FMAX);p.likes.concat(p.dislikes).forEach(t=>p.known[t]=1);const m=R(5,30);c.money+=m;return {msg:`${p.first} nobijies atdod ${usd(m)} un izstāsta visu par sevi.`,b:'Labi, labi!'}}p.f=cl(p.f-10,0,FMAX);addSt('health',-5);return {msg:`${p.first} iesit tev pa degunu!`,b:'Pazūdi!'}}))}
   }
-  // uzdevumi
   if(p.qOffer){ch.unshift({l:'„Vai varu kā palīdzēt?”',s:p.qOffer.desc,fn:()=>{acceptQuest(p);again()}})}
-  S.quests.filter(q=>!q.done&&q.giver===p.id).forEach(q=>{
-    if(q.type==='bring'&&C().inv[q.item])ch.unshift({l:`Atdot: ${ITEMS[q.item].n}`,s:`Atlīdzība ${eur(q.reward)}`,fn:()=>{C().inv[q.item]--;completeQuest(q);bubble(n,'Paldies!');again()}});
-    if(q.type==='pet'&&C().inv.kakis)ch.unshift({l:'Atdot kaķi Minci',s:`Atlīdzība ${eur(q.reward)}`,fn:()=>{completeQuest(q);bubble(n,'Mince!!!');again()}});
-  });
+  S.quests.filter(q=>!q.done&&q.giver===p.id).forEach(q=>{if(q.type==='bring'&&C().inv[q.item])ch.unshift({l:`Atdot: ${ITEMS[q.item].n}`,s:`Atlīdzība ${usd(q.reward)}`,fn:()=>{C().inv[q.item]--;completeQuest(q);bubble(n,'Paldies!');again()}})});
   ch.push({l:'Atvadīties',exit:true,fn:close});
-  const known=p.rel!=='none';
-  const likes=known?TOPICS.filter(t=>p.known&&p.known[t]).map(t=>(p.traits.likes.includes(t)?'❤ ':p.traits.dis.includes(t)?'✕ ':'· ')+t).join('  '):'';
-  const b=known?`<div class="relrow"><span>Draudzība</span>${bar(p.close)}<b>${Math.round(p.close)}</b></div>${!fam&&adult?`<div class="relrow"><span>Romantika</span>${bar(p.rom,'love')}<b>${Math.round(p.rom)}</b></div>`:''}${likes?`<p class="muted small">${esc(likes)}</p>`:''}`:'<p class="muted" style="margin:0">Tu vēl nepazīsti šo cilvēku.</p>';
-  modal({t:known?fullName(p):'Svešinieks',sub:`${known?relName(p)+' · ':''}${ageOf(p.bT)} g.${p.jobT&&known?' · '+p.jobT:''} · ${clockStr()}`,b,ch});
+  const known=p.met;
+  const ints=known?TOPICS.filter(t=>p.known[t]).map(t=>`<span class="tag ${p.likes.includes(t)?'lk':p.dislikes.includes(t)?'dk':''}">${TOPIC_ICON[t]} ${t}</span>`).join(''):'';
+  const body=known?`<div class="relrow"><span>${rankOf(p.f)}</span>${bar(p.f/FMAX*100)}<b>${Math.round(p.f)}</b></div>${!p.fam&&!p.noRom?`<div class="relrow"><span>Romantika</span>${bar(p.rom/FMAX*100,'love')}<b>${Math.round(p.rom)}</b></div>`:''}${ints?`<div class="tags">${ints}</div>`:'<p class="muted small" style="margin:0">Intereses vēl nezini — runā par dažādām tēmām vai pajautā.</p>'}${p.bio&&p.cast?`<p class="muted small" style="margin:4px 0 0">${esc(p.bio)}</p>`:''}${C().needs.hygiene<30?'<p class="small" style="color:var(--bad);margin:4px 0 0">No tevis ož… Sarunas iet sliktāk. Ej dušā!</p>':''}`:`<p class="muted" style="margin:0">Tu vēl nepazīsti šo cilvēku.${gw?' '+esc(gw):''}</p>`;
+  modal({t:known?fullName(p):(p.cast?p.role:'Svešinieks'),sub:`${known?(p.role?p.role+' · ':'')+relLabel(p):DISTS[p.zone]?.n||''} · ${clockStr()}`,b:body,ch});
 }
 function topicMenu(n,p){
-  const c=C(),mm=moodMul();
-  modal({t:`Runāt ar ${p.first} par…`,ch:TOPICS.map(t=>({l:t,s:p.known&&p.known[t]?(p.traits.likes.includes(t)?'Patīk!':p.traits.dis.includes(t)?'Nepatīk':'Neitrāli'):'',fn:()=>{
-    if(!spendT(15,0)){n.talking=false;return}p.known=p.known||{};p.known[t]=1;
-    let msg,b;if(p.traits.likes.includes(t)){p.close=cl(p.close+R(8,12)*mm);msg=`${p.first} dievina šo tēmu!`;b='Es to dievinu!'}else if(p.traits.dis.includes(t)){p.close=cl(p.close-6);msg=`${p.first} garlaikojas.`;b='Garlaicīgi…'}else{p.close=cl(p.close+R(2,4)*mm);msg='Jauka saruna.';b='Interesanti.'}
-    if(p.rel==='acq'&&p.close>=45)p.rel='friend';if(p.rel==='friend'&&p.close<35)p.rel='acq';
-    need('fun',2);toast(msg);bubble(n,b);checkTrophies();renderHUD();save();socialMenu(n)}})).concat([{l:'Atpakaļ',exit:true,fn:()=>socialMenu(n)}])});
+  modal({t:`Runāt ar ${nAcc(p.first)} par…`,sub:'Pieskaņo tēmu sarunu biedra interesēm',ch:TOPICS.map(t=>({l:`${TOPIC_ICON[t]} ${t}`,s:p.known[t]?(p.likes.includes(t)?'Patīk!':p.dislikes.includes(t)?'Nepatīk':'Neitrāli'):'',fn:()=>{
+    if(!spendT(30,0)){n.talking=false;return}const mul=socialMul(),rep=p.tDay[t]||0,fat=1/(1+rep);p.tDay[t]=rep+1;
+    let msg,b;if(p.likes.includes(t)){p.known[t]=1;bond(p,R(8,12)*fat,R(0,2)*fat);msg=rep?`${p.first} jau par to runāja… (${Math.round(fat*100)}%)`:`${p.first} dievina šo tēmu! 😊`;b=pick(TOPIC_LINE[t])}
+    else if(p.dislikes.includes(t)){p.known[t]=1;p.f=cl(p.f-6,0,FMAX);msg=`${p.first} žāvājas… 🥱`;b='Garlaicīgi…'}
+    else{bond(p,R(2,4)*fat,0);p.known[t]=p.known[t]||0;msg='Jauka saruna.';b='Interesanti.'}
+    p.lastSeen=S.day;toast(msg);bubble(n,b);checkTrophies();if(typeof storyHour==='function')storyHour();renderHUD();save();socialMenu(n)}})).concat([{l:'Atpakaļ',exit:true,fn:()=>socialMenu(n)}])});
 }
-function giftMenu(n,p){const c=C();const gifts=Object.keys(c.inv).filter(k=>c.inv[k]>0&&ITEMS[k].gift);
-  modal({t:`Dāvana: ${p.first}`,ch:gifts.map(k=>({l:ITEMS[k].n,s:`Tev ir ${c.inv[k]}`,fn:()=>{c.inv[k]--;const [cc,rr]=ITEMS[k].gift;p.close=cl(p.close+cc);if(!isFamily(p)&&ageOf(p.bT)>=18)p.rom=cl(p.rom+rr);bubble(n,'Paldies!!');toast(`${p.first} priecājas par dāvanu.`);advance(5);save();socialMenu(n)}})).concat([{l:'Atpakaļ',exit:true,fn:()=>socialMenu(n)}])})}
+function jokeMenu(n,p){const c=C();
+  const J=[['smalks','Asprātīgs joks','Humors + kultūra'],['rupjš','Rupjš joks','Humors'],['prank','Izspēlēt palaidnību','+1 noziedzīgums']];
+  modal({t:`Jokot ar ${nAcc(p.first)}`,ch:J.map(([k,l,s])=>({l,s:s+' · 10 min',fn:()=>{if(!spendT(10,0)){n.talking=false;return}const mul=socialMul();let msg,b;
+    const taste=k==='prank'?p.humor==='rupjš':(p.humor==='visi'||p.humor===k);const skill=k==='smalks'?.2+c.st.humor/130+c.st.culture/260:k==='rupjš'?.3+c.st.humor/110:.35;
+    if(k==='prank')addSt('crime',1);
+    if(taste&&rnd()<skill*mul+(p.jokes?.15:0)){bond(p,R(6,10)*(p.jokes?1.5:1),0);msg=`${p.first} smejas līdz asarām!`;b=pick(['Hahaha!','Tu esi traks!','Ha! Labs!'])}
+    else if(!taste){p.f=cl(p.f-(k==='rupjš'&&p.key==='olivia'?12:6),0,FMAX);msg=`${p.first} nav tāda humora izjūta.`;b=k==='rupjš'?'Cik pretīgi!':'Ē… nesapratu.'}
+    else{p.f=cl(p.f-2,0,FMAX);msg='Joks nenostrādāja.';b='…'}
+    p.lastSeen=S.day;toast(msg);bubble(n,b);checkTrophies();renderHUD();save();socialMenu(n)}})).concat([{l:'Atpakaļ',exit:true,fn:()=>socialMenu(n)}])});
+}
+function giftMenu(n,p){const c=C();const gifts=Object.keys(c.inv).filter(k=>c.inv[k]>0&&(ITEMS[k].gift||(p.key==='sam'&&k==='hotdog')));
+  modal({t:`Dāvana: ${p.first}`,ch:gifts.map(k=>({l:ITEMS[k].n,s:`Tev ir ${c.inv[k]}${ITEMS[k].tag&&p.known[ITEMS[k].tag]!=null?(p.likes.includes(ITEMS[k].tag)?' · patiks!':p.dislikes.includes(ITEMS[k].tag)?' · nepatiks':''):''}`,fn:()=>{c.inv[k]--;
+    if(p.key==='sam'&&k==='hotdog'){S.flags.samFed=S.day;bond(p,8,0);bubble(n,'Mmm! Tagad varu tev ko iemācīt.');toast('Sems apēd hotdogu un ir gatavs mācīt.');advance(5);save();socialMenu(n);return}
+    const it=ITEMS[k];let v=it.gift;if(it.tag&&p.likes.includes(it.tag)){v*=2;p.known[it.tag]=1}else if(it.tag&&p.dislikes.includes(it.tag)){v*=.3;p.known[it.tag]=1}
+    bond(p,v,!p.noRom&&p.f>=35?v*.6:0);bubble(n,v>=12?'Wow, paldies!!':v<4?'Ē… paldies.':'Paldies!');toast(`${p.first} ${v>=12?'ir sajūsmā':'saņem dāvanu'}.`);advance(5);save();socialMenu(n)}})).concat([{l:'Atpakaļ',exit:true,fn:()=>socialMenu(n)}])})}
+
+/* ---------- Randiņi ---------- */
+function dateMenu(n,p){const c=C(),h=hourNow(),back=()=>{if(n.phone)refreshUI();else socialMenu(n)};
+  modal({t:`Randiņš ar ${nAcc(p.first)}`,sub:'Partneris tevi gaidīs vietā pēc ~1 stundas',ch:DATES.map(d=>{const b=bld(d.b),why=reqWhy(d.req),open=h+1<b.hours[1]-2&&h+1>=b.hours[0]-1;
+    return {l:`${d.n} · ${usd(d.p)}`,s:`${b.n}${d.req&&Object.keys(d.req).length?' · '+Object.entries(d.req).map(([k,v])=>STN[k].toLowerCase()+' '+v).join(', '):''}${p.known[d.tag]&&p.likes.includes(d.tag)?' · ❤ patiks':''}`,dis:!open,why:!open?'Tur šodien vairs nevar':why?'Ieteicams: '+why:null,fn:()=>{
+      advance(5);const ok=p.steady||rnd()<.35+p.rom/110+p.f/260;if(!ok){p.f=cl(p.f-2,0,FMAX);toast(`${p.first}: „Šodien nevaru, piedod.”`);bubble(n,'Varbūt citreiz…');save();back();return}
+      const from=Math.max(h+1,b.hours[0]);p.appt={b:d.b,day:S.day,from,until:Math.min(b.hours[1],from+3),date:d.id};n.talking=false;n.hold=false;if(S.comp===p.id)dismissComp(true);
+      log(`Randiņš: ${p.first} gaidīs tevi ${b.n} ap ${hstr(Math.ceil(from*2)/2)} (${d.n}).`,'g');toast(`${p.first} piekrīt! ${b.n}, ap ${hstr(Math.ceil(from*2)/2)}.`);bubble(n,'❤ Līdz tikšanās!');refreshUI();save()}}}).concat([{l:'Atpakaļ',exit:true,fn:back}])})}
+function doDate(p,d,n){const c=C();
+  if(!spendT(120,d.p)){socialMenu(n);return}
+  let v=d.v;const why=reqWhy(d.req);if(why)v*=.35;if(p.likes.includes(d.tag)){v*=1.5;p.known[d.tag]=1}else if(p.dislikes.includes(d.tag))v*=.5;
+  bond(p,v*.6,v);p.dates=(p.dates||0)+1;S.flags.dates=(S.flags.dates||0)+1;S.flags['d_'+d.id]=1;p.appt=null;addFame(1);
+  const eff={cinema:{culture:2,humor:2},dinner:{health:1},boat:{health:2},carriage:{culture:1},empire:{culture:3},club:{humor:2},jazz:{culture:2},show:{culture:5},opera:{culture:8},seaport:{culture:2}}[d.id]||{};for(const k in eff)addSt(k,eff[k]);
+  if(d.id==='dinner'||d.id==='seaport')eat(55);
+  const msg=why?`Randiņš bija neveikls (${why}). ${p.first} tomēr pasmaida.`:p.likes.includes(d.tag)?`Brīnišķīgs randiņš! ${p.first} ir sajūsmā.`:`Jauks randiņš ar ${nAcc(p.first)}.`;
+  log(`${d.n} ar ${nAcc(p.first)}: ${msg}`,'g');n.talking=false;n.hold=false;setComp(p);
+  modal({t:d.n,sub:`Randiņš nr. ${p.dates} ar ${nAcc(p.first)}`,b:`<p>${esc(msg)}</p><div class="relrow"><span>Romantika</span>${bar(p.rom/FMAX*100,'love')}<b>${Math.round(p.rom)}</b></div>${!p.steady&&p.dates>=3&&p.rom>=70?'<p class="small" style="color:var(--good)">Varbūt ir laiks piedāvāt kļūt par pāri?</p>':''}`,ch:[{l:'Turpināt kopā'}]});
+  checkTrophies();if(typeof storyHour==='function')storyHour();refreshUI();save();
+}
 
 /* ---------- Galvenais cikls ---------- */
-let lastT=performance.now(),HUDT=0;
+let lastT=performance.now(),HUDT=0,NEEDT=0;
+function needAlerts(){const c=C(),n=c.needs;
+  if(n.bladder<=0){n.bladder=70;need('hygiene',-45);addSt('beauty',-2);S.flags.accident=(S.flags.accident||0)+1;NPCS.forEach(x=>{const p=pById(x.pid);if(p&&p.met&&Math.hypot(x.x-P.x,x.y-P.y)<4){p.f=cl(p.f-4,0,FMAX);bubble(x,'Fū!')}});toast('Ak nē… tu nepaspēji līdz tualetei! 😳');log('Negadījums ar tualeti. Kauns!','b')}
+  const warn=(k,txt)=>{if(n[k]<15&&S.warn!==k+S.day+Math.floor(S.min/120)){S.warn=k+S.day+Math.floor(S.min/120);tick(txt,'b')}};
+  warn('food','🍎 Tu esi izsalcis — paēd!');warn('energy','zZ Tu esi noguris — izguļies vai iedzer kafiju.');warn('hygiene','🚿 No tevis ož — ej dušā!');warn('bladder','WC Steidzami vajag uz tualeti!');
+}
 function frame(now){
   const dt=Math.min(.05,(now-lastT)/1000);lastT=now;TIME=now/1000;
-  if(S&&S.c&&!S.dead&&S.tab==='city'&&!document.hidden){
-    const h=hourNow();DUSK=h>=17?cl((h-17)/3,0,1):0;NIGHT=h>=19.5?cl((h-19.5)/2,0,1):0;if(S.where)NIGHT=Math.min(NIGHT,.9);
-    const modalOpen=!!$('#modalRoot').innerHTML;
-    if(!modalOpen&&!C().jail){
+  if(S&&S.c&&!S.over&&S.tab==='city'&&!document.hidden){
+    const h=hourNow();DUSK=h>=18?cl((h-18)/2.5,0,1):0;NIGHT=h>=20?cl((h-20)/1.5,0,1):0;if(S.where)NIGHT=Math.min(NIGHT,.9);
+    const modalOpen=!!$('#modalRoot').innerHTML||MG_ON;
+    if(!modalOpen){
       if(!P.path.length&&keyDir){const m=curMap(),nx=Math.floor(P.x)+keyDir[0],ny=Math.floor(P.y)+keyDir[1];if(m.walk(nx,ny)){P.path=[[nx,ny]];P.target=null;
         if(!S.where){const door=BLDS.find(b=>b.door[0]===nx&&b.door[1]===ny);if(door)P.target={type:'door',id:door.id}}else if(nx===ROOM.exit[0]&&ny===ROOM.exit[1])P.target={type:'exit'}}}
       playerStep(dt);
+      if(S.min<DAY_MIN)advance(dt*(S.speed||2));
+      NEEDT+=dt;if(NEEDT>1){NEEDT=0;needAlerts();renderNeeds()}
     }
     if(!S.where)updCars(dt);updNPCs(dt);
     const ps=iso(P.x,P.y);let tx=ps.x,ty=ps.y-30;if(S.where){const rc=iso(ROOM.W/2,ROOM.H/2);tx=rc.x*.75+ps.x*.25;ty=(rc.y-40)*.75+(ps.y-30)*.25}if(!cam.init){cam.x=tx;cam.y=ty;cam.init=true}cam.x+=(tx-cam.x)*Math.min(1,dt*6);cam.y+=(ty-cam.y)*Math.min(1,dt*6);
     if(S.where)renderRoom(ROOM,dt);else renderCity(dt);
-    HUDT+=dt;if(HUDT>.5){HUDT=0;const ck=document.querySelector('.pill.clock');if(ck)ck.textContent=C().jail?'--:--':clockStr()}
-    if(!modalOpen&&S.min>=DAY_MIN){S.min=DAY_MIN;P.path=[];modal({t:'Ir 02:00',b:'<p>Tu esi pārāk noguris, lai turpinātu. Acis veras ciet…</p>',ch:[{l:'Gulēt',fn:()=>endDay(S.where&&S.where.variant==='home'?'home':S.where&&S.where.b==='hotel'?'hotel':'bench')}]})}
-    else if(!modalOpen&&C().needs.energy<=0&&!C().jail){C().needs.energy=5;P.path=[];addStat('health',-4);modal({t:'Tu sabrūc no noguruma',b:'<p>Enerģija beigusies. Tev steidzami jāguļ.</p>',ch:[{l:'Gulēt',fn:()=>endDay(S.where&&S.where.variant==='home'?'home':'bench')}]})}
+    HUDT+=dt;if(HUDT>.5){HUDT=0;const ck=document.querySelector('.pill.clock');if(ck)ck.textContent=clockStr()}
+    if(!modalOpen&&S.min>=DAY_MIN){S.min=DAY_MIN;P.path=[];modal({t:'Ir 04:00',b:'<p>Tu esi pārāk noguris, lai turpinātu. Acis veras ciet…</p>',ch:[{l:'Gulēt',fn:()=>endDay(S.where&&S.where.variant==='home'?'home':S.where&&S.where.b==='plaza'?'hotel':'bench')}]})}
+    else if(!modalOpen&&C().needs.energy<=0){C().needs.energy=5;P.path=[];addSt('health',-4);modal({t:'Tu sabrūc no noguruma',b:'<p>Tev steidzami jāizguļas.</p>',ch:[{l:'Gulēt',fn:()=>endDay(S.where&&S.where.variant==='home'?'home':'bench')}]})}
   }
   requestAnimationFrame(frame);
 }

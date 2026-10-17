@@ -61,7 +61,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v1.0.${{ github.run_number }}
-          name: Ostmalas dinastija 1.0.${{ github.run_number }}
+          name: Lielais Ābols 1.0.${{ github.run_number }}
           body: "Testa versija. Lejupielādē ostmalas-dinastija.apk un instalē telefonā."
           make_latest: true
           files: ostmalas-dinastija.apk

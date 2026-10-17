@@ -68,7 +68,7 @@ public class MainActivity extends ComponentActivity {
             public void handleOnBackPressed() {
                 web.evaluateJavascript(
                         "(function(){try{if(typeof S==='undefined'||!S||!S.c)return 'X';" +
-                        "var d=document.querySelector('#dance');if(d&&!d.hidden)return 'K';" +
+                        "var d=document.querySelector('#mg');if(d&&!d.hidden)return 'K';" +
                         "var r=document.querySelector('#modalRoot');" +
                         "if(r&&r.innerHTML){r.innerHTML='';refreshUI();if(typeof nextModal==='function')nextModal();return 'K'}" +
                         "if(S.tab!=='city'){S.tab='city';refreshUI();return 'K'}" +
