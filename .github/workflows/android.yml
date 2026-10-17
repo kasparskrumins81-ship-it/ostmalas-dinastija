@@ -5,6 +5,9 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-24.04
@@ -50,6 +53,18 @@ jobs:
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: gradle :app:bundleRelease :app:assembleRelease --no-daemon
+
+      - name: APK ar pastāvīgu nosaukumu
+        run: cp app/build/outputs/apk/debug/app-debug.apk ostmalas-dinastija.apk
+
+      - name: Publicē lejupielādei (Releases)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: Ostmalas dinastija 1.0.${{ github.run_number }}
+          body: "Testa versija. Lejupielādē ostmalas-dinastija.apk un instalē telefonā."
+          make_latest: true
+          files: ostmalas-dinastija.apk
 
       - uses: actions/upload-artifact@v4
         with:
