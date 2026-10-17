@@ -24,7 +24,13 @@ jobs:
         run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
 
       - name: Testa APK (debug)
-        run: gradle :app:assembleDebug --no-daemon
+        run: |
+          set -o pipefail
+          gradle :app:assembleDebug --no-daemon --stacktrace 2>&1 | tee build.log || {
+            msg=$( (grep -E "^e: |error:|ERROR|What went wrong" -A6 build.log || tail -40 build.log) | head -60 | sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g')
+            echo "::error title=Gradle::$msg"
+            exit 1
+          }
 
       - name: Paraksta atslēga (ja ir iestatīta)
         id: ks
