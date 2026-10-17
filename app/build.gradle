@@ -1,0 +1,49 @@
+plugins {
+    id 'com.android.application'
+}
+
+// Versijas numurs pieaug ar katru GitHub būvējumu
+def runNumber = (System.getenv('GITHUB_RUN_NUMBER') ?: '1') as int
+def ksFile = System.getenv('ANDROID_KEYSTORE_FILE')
+
+android {
+    namespace 'lv.ostmala.dinastija'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId 'lv.ostmala.dinastija'
+        minSdk 26
+        targetSdk 36
+        versionCode runNumber
+        versionName "1.0.${runNumber}"
+    }
+
+    signingConfigs {
+        release {
+            if (ksFile) {
+                storeFile file(ksFile)
+                storePassword System.getenv('ANDROID_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('ANDROID_KEY_ALIAS')
+                keyPassword System.getenv('ANDROID_KEY_PASSWORD')
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            if (ksFile) signingConfig signingConfigs.release
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation 'androidx.activity:activity:1.9.3'
+    implementation 'androidx.core:core:1.13.1'
+    implementation 'androidx.webkit:webkit:1.12.1'
+}

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <!-- saule -->
+    <path android:fillColor="#FFFFD36B" android:pathData="M54,46m-14,0a14,14 0,1 1,28 0a14,14 0,1 1,-28 0"/>
+    <!-- pilsētas siluets -->
+    <path android:fillColor="#FF1A1033"
+        android:pathData="M28,74V52h8v-6h6v28h4V40h10v34h4V48h8v26h4V56h8v18z"/>
+    <!-- logi -->
+    <path android:fillColor="#FF4FF0FF" android:pathData="M48,44h2v3h-2zM52,44h2v3h-2zM48,50h2v3h-2zM52,56h2v3h-2zM62,52h2v3h-2zM66,58h2v3h-2zM31,56h2v3h-2z"/>
+    <!-- ūdens -->
+    <path android:fillColor="#FF2EC4D6" android:pathData="M28,76h52v3h-52z"/>
+    <path android:fillColor="#AA2EC4D6" android:pathData="M34,81h40v2h-40z"/>
+</vector>
