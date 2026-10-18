@@ -6,11 +6,31 @@ const MQ=[];
 function nextModal(){const root=$('#modalRoot');if(!root.innerHTML&&MQ.length)modal(MQ.shift())}
 function modal(o){
   const root=$('#modalRoot');if(root.innerHTML){MQ.push(o);return}
+  if(o.wheel)return wheelUI(o);
   const {t,sub,b,ch,closable}=o;
   root.innerHTML=`<div class="ov" role="dialog" aria-modal="true" aria-label="${esc(t)}"><div class="sheet"><div class="head">${sub?`<span class="lab">${esc(sub)}</span>`:''}<h2>${esc(t)}</h2></div>${b?`<div class="body">${b}</div>`:''}<div class="ch">${(ch||[]).map((c,i)=>c.hdr?`<div class="chh">${esc(c.hdr)}</div>`:`<button data-i="${i}" class="${c.exit?'exit':''}" ${c.dis?'disabled':''}><b>${esc(c.l)}</b>${c.s?`<span>${esc(c.s)}</span>`:''}${c.why?`<span class="why">${esc(c.why)}</span>`:''}</button>`).join('')}${closable?`<button data-x="1" class="exit"><b>Atpakaļ</b></button>`:''}</div></div></div>`;
   root.querySelectorAll('button[data-i]').forEach(btn=>btn.onclick=()=>{const c=ch[+btn.dataset.i];root.innerHTML='';if(c.fn)c.fn();else{refreshUI();save()}nextModal()});
   const x=root.querySelector('[data-x]');if(x)x.onclick=()=>{root.innerHTML='';refreshUI();nextModal()};
   const f=root.querySelector('button:not(:disabled)');if(f)f.focus({preventScroll:true});
+}
+const WICON=[[/Sākt randiņu/,'❤'],[/Sasveicināties/,'👋'],[/Mēģināt parunāt|Runāt par/,'💬'],[/Pajautāt/,'❓'],[/Jokot/,'😂'],[/Tenkot/,'🤫'],[/numur/,'📱'],[/Flirtēt/,'😘'],[/randiņ/i,'🌹'],[/Noskūpstīt/,'💋'],[/pāri/,'💍'],[/Izšķirties/,'💔'],[/Atvadīties līdz/,'👋'],[/līdzi/,'🚶'],[/Dāvināt/,'🎁'],[/ieteikumu/,'💼'],[/Iebiedēt/,'👊'],[/palīdzēt/,'❗'],[/Atdot/,'📦'],[/Asprātīgs/,'🎩'],[/Rupjš/,'🤪'],[/palaidnīb/,'💥'],[/Iemācīties|mācīt/,'🥋'],[/Strādāt|darb/i,'💼']];
+function wIcon(l){const m=l.match(/^([^\p{L}\p{N}\s„"]+)\s*/u);if(m)return [m[1],l.slice(m[0].length)];for(const [r,i] of WICON)if(r.test(l))return [i,l];return ['⭐',l]}
+function wheelUI(o){const root=$('#modalRoot');const all=o.ch.filter(c=>!c.hdr),ex=all.find(c=>c.exit),items=all.filter(c=>!c.exit);
+  let ring=items,more=null;if(items.length>12){ring=items.slice(0,11);more=items.slice(11)}
+  const n=ring.length+(more?1:0),W=Math.min(innerWidth,520),H=innerHeight,rx=Math.min(W/2-46,175),ry=Math.min(H/2-150,200,rx*1.15);
+  const pos=i=>{const a=-Math.PI/2+i/n*Math.PI*2;return [Math.cos(a)*rx,Math.sin(a)*ry]};
+  const btn=(c,i,ic,lab)=>{const [x,y]=pos(i);return `<button class="wi ${c&&c.dis?'off':''}" data-w="${i}" style="transform:translate(${x.toFixed(0)}px,${y.toFixed(0)}px)"><i>${ic}</i><span>${esc(lab.split(' (kopā')[0].replace(/…$/,''))}</span></button>`};
+  root.innerHTML=`<div class="wov" role="dialog" aria-modal="true" aria-label="${esc(o.t)}"><div class="wtop"><span class="lab">${esc(o.sub||'')}</span><h2>${esc(o.t)}</h2></div>
+   <div class="wring"><div class="wcen">${o.wheel.pic||''}</div>${ring.map((c,i)=>{const [ic,l]=wIcon(c.l);return btn(c,i,ic,l)}).join('')}${more?btn(null,ring.length,'➕','Vairāk'):''}</div>
+   <div class="wcap" id="wcap">${o.wheel.cap?esc(o.wheel.cap):'Izvēlies ikonu'}</div>
+   <div class="winfo">${o.wheel.info||o.b||''}</div>
+   <button class="wx" data-x>${ex?esc(ex.l):'Aizvērt'}</button></div>`;
+  const run=c=>{root.innerHTML='';if(c.fn)c.fn();else{refreshUI();save()}nextModal()};
+  root.querySelectorAll('.wi').forEach(b=>{const i=+b.dataset.w,c=ring[i];
+    b.onmouseenter=()=>{if(c)$('#wcap').textContent=(c.l.replace(/^[^\p{L}\p{N}„"]+\s*/u,''))+(c.s?' — '+c.s:'')};
+    b.onclick=()=>{if(!c){root.innerHTML='';modal({t:o.t,sub:o.sub,ch:more.concat([{l:'Atpakaļ',exit:true,fn:ex&&ex.fn&&o.wheel.back?o.wheel.back:()=>wheelUI(o)}])});return}
+      if(c.dis){$('#wcap').innerHTML=`<b>${esc(c.l)}</b> — ${esc(c.why||'Nav pieejams')}`;b.classList.remove('shk');void b.offsetWidth;b.classList.add('shk');return}run(c)}});
+  root.querySelector('[data-x]').onclick=()=>{root.innerHTML='';if(ex&&ex.fn)ex.fn();else refreshUI();nextModal()};
 }
 function bar(v,cls='',plain){const w=cl(v);return `<div class="bar ${cls} ${plain?'':w<25?'low':w<45?'warn':''}"><span style="width:${w}%"></span></div>`}
 function done(m){if(m){log(m);toast(m)}refreshUI();save()}
@@ -24,7 +44,7 @@ function refreshUI(){if(!S||!S.c)return;renderHUD();renderBanners();
 }
 function renderHUD(){
   if(!S||!S.c)return;const c=C();
-  const where=S.where?bld(S.where.b).n:DISTS[distAt(Math.floor(P.x),Math.floor(P.y))].n;
+  const where=S.where?bld(S.where.b).n:SCENES[S.scene||'gv1'].n;
   $('#hud').innerHTML=`<div class="hud-card glass"><div class="r1">
     <img class="ava" src="${portraitURL(myLook(),c.sex,null)}" alt="">
     <div class="who"><b>${esc(c.first)}</b><span>${S.extended?S.day+'. diena':`Diena ${Math.min(S.day,LEASE_DAYS)}/${LEASE_DAYS}`} · ${WX[S.weather||'clear'].i} · ${esc(where)}</span></div>
@@ -67,7 +87,7 @@ function homeModal(){const c=C();modal({t:'Mājokļi',sub:`Pašlaik: ${HOMES[c.h
 /* ---------- Telefons ---------- */
 function renderPhone(){
   const t=S.phoneTab||'contacts',c=C();
-  const tabs=[['contacts','Kontakti'],['msgs','Ziņas'],['quests','Uzdevumi'],['map','Karte'],['trophies','Sasniegumi']];
+  const tabs=[['contacts','Kontakti'],['msgs','Ziņas'],['quests','Uzdevumi'],['trophies','Sasniegumi']];
   let body='';
   if(t==='contacts'){const list=S.people.filter(p=>p.met).sort((a,b)=>(b.steady?999:0)+b.f-(a.steady?999:0)-a.f);
     body=list.length?`<div class="rows">${list.map(p=>{const ints=TOPICS.filter(x=>p.known[x]).map(x=>`<span class="tag ${p.likes.includes(x)?'lk':p.dislikes.includes(x)?'dk':''}">${TOPIC_ICON[x]} ${x}</span>`).join('');
@@ -76,7 +96,7 @@ function renderPhone(){
     return `<div class="row msg"><div class="nm"><b>${p?esc(p.first):'Ziņa'}</b><span>${m.day}. diena</span><p>${esc(m.text)}</p></div>${(m.type==='invite'||m.type==='date')&&m.day===S.day&&!m.done?`<button class="btn" data-acc="${m.id}">Piekrist</button>`:''}${m.type==='chat'&&!m.done&&p?`<button class="btn" data-rep="${m.id}">Atbildēt</button>`:''}</div>`}).join('')}</div>`:'<p class="muted">Ziņu nav.</p>'}
   if(t==='quests'){const ob=objectives(),q=S.quests.filter(x=>!x.done);
     body=`<div class="lab">Stāsts</div><div class="rows">${ob.map(o=>`<div class="row obj ${o.done?'ok':''}"><span class="ck">${o.done?'✓':'○'}</span><div class="nm"><b>${esc(o.t)}</b>${!o.done?`<span>${esc(o.hint)}</span>`:''}</div></div>`).join('')}</div>
-    <div class="lab">Lūgumi</div>${q.length?`<div class="rows">${q.map(x=>`<div class="row"><div class="nm"><b>${esc(x.desc)}</b><span>Atlīdzība ${usd(x.reward)}${x.exp!=null?` · līdz ${x.exp}. dienai`:''}</span></div>${x.b?`<button class="btn" data-goq="${x.b}">Rādīt</button>`:''}</div>`).join('')}</div>`:'<p class="muted small">Cilvēki ar zilu <b>?</b> virs galvas lūdz palīdzību.</p>'}`}
+    <div class="lab">Lūgumi</div>${q.length?`<div class="rows">${q.map(x=>`<div class="row"><div class="nm"><b>${esc(x.desc)}</b><span>Atlīdzība ${usd(x.reward)}${x.exp!=null?` · līdz ${x.exp}. dienai`:''}</span></div>${x.b?`<button class="btn" data-goq="${x.b}">Kartē</button>`:''}</div>`).join('')}</div>`:'<p class="muted small">Cilvēki ar zilu <b>?</b> virs galvas lūdz palīdzību.</p>'}`}
   if(t==='map')body=`<canvas id="mapc" class="mapc"></canvas><div class="legend">${Object.values(DISTS).map(d=>`<span><i style="background:${d.c}"></i>${d.n}</span>`).join('')}<span><i style="background:#5fd38a;border-radius:50%"></i>Metro</span></div><p class="muted small">Pieskaries ēkai: aiziet, braukt ar taksometru vai metro.</p>`;
   if(t==='trophies')body=`<div class="tro">${TROPHIES.map(x=>`<div class="tr ${S.trophies.includes(x.id)?'got':''}"><b>${S.trophies.includes(x.id)?'🏆':'○'} ${esc(x.n)}</b><span>${esc(x.d)}</span></div>`).join('')}</div>`;
   $('#phoneWrap').innerHTML=`<div class="phone"><div class="ptop"><b>${clockStr()}</b><span>${S.day}. diena · ${usd(c.money)}</span></div><div class="ptabs">${tabs.map(([k,n])=>`<button data-pt="${k}" aria-pressed="${k===t}">${n}${k==='msgs'&&S.msgs.some(m=>!m.read)?' •':''}</button>`).join('')}</div><div class="pbody">${body}</div>
@@ -89,36 +109,48 @@ function renderPhone(){
     if(m.type==='date'){const d=DATES.find(x=>x.id===m.date),bb=bld(d.b);const from=Math.max(h+1,bb.hours[0]);p.appt={b:d.b,day:S.day,from,until:Math.min(bb.hours[1],from+3),date:d.id};done(`Randiņš: ${p.first} gaidīs tevi ${bb.n} ap ${hstr(Math.ceil(from*2)/2)}.`)}
     else{p.appt={b:m.b,day:S.day,from:Math.max(h,m.from_h),until:Math.max(h,m.from_h)+3};bond(p,2,0);done(`${p.first} gaidīs tevi ${bld(m.b).n} no ${hstr(p.appt.from)}.`)}renderPhone()});
   $('#phoneWrap').querySelectorAll('[data-rep]').forEach(b=>b.onclick=()=>{const m=S.msgs.find(x=>x.id===+b.dataset.rep),p=pById(m.from);m.done=true;bond(p,3,p.steady?3:0);p.lastSeen=S.day;advance(2);done(`Tu atbildi ${nDat(p.first)}.`);renderPhone()});
-  $('#phoneWrap').querySelectorAll('[data-goq]').forEach(b=>b.onclick=()=>mapInfo(bld(b.dataset.goq)));
-  if(t==='map')drawMap();
+  $('#phoneWrap').querySelectorAll('[data-goq]').forEach(b=>b.onclick=()=>{S.tab='city';refreshUI();openMap(null,SCENE_OF[b.dataset.goq])});
 }
 function inviteModal(p){const h=hourNow();const places=['cafe','pizza','pub','diner','dimsum','arcade','karaoke','jazz','gallery','plaza'];
   modal({t:`Uzaicināt ${nAcc(p.first)}`,sub:'Kur satiksieties?',ch:[...(!p.fam&&!p.noRom&&(p.f>=50||p.rom>=25)?[{l:'❤ Aicināt uz randiņu…',s:'Izvēlēties randiņa vietu',fn:()=>dateMenu({talking:false,hold:false,x:0,y:0,pid:p.id,phone:1},p)}]:[]),
     ...places.map(id=>{const bb=bld(id);const open=h<bb.hours[1]-1;return {l:bb.n,s:`${DISTS[bb.dist].n} · ${open?'atvērts līdz '+hstr(bb.hours[1]):'šodien vairs nav atvērts'}`,dis:!open,fn:()=>{advance(5);
     const ok=(p.f>=25||p.steady||p.fam)&&rnd()<.55+p.f/200+p.rom/200;if(!ok){p.f=cl(p.f-2,0,FMAX);done(`${p.first}: „Šodien nevaru, piedod.”`);return}
     p.appt={b:id,day:S.day,from:Math.max(h,bb.hours[0])+.5,until:Math.min(bb.hours[1],Math.max(h,bb.hours[0])+3.5)};done(`${p.first} piekrīt! Tiekaties ${bb.n} ap ${hstr(Math.ceil(p.appt.from*2)/2)}.`)}}})].concat([{l:'Atcelt',exit:true}])})}
-let MAPS=4;
-function drawMap(){const cvm=$('#mapc');if(!cvm)return;const w=cvm.clientWidth;MAPS=w/64;cvm.width=Math.round(w*DPR);cvm.height=Math.round(w*DPR);const g=cvm.getContext('2d');g.scale(DPR*MAPS,DPR*MAPS);
-  const col={0:'#9fd17f',1:'#5a5e6b',2:'#d8d4cc',3:'#3f8db4',4:'#bdb8b0',5:'#e8e1d3',6:'#ccc',7:'#8a6a4a',8:'#9a7048',9:'#86c46b',10:'#e6d6a8',11:'#9a96a6'};
-  for(let y=0;y<H;y++)for(let x=0;x<W;x++){const t=grid[gi(x,y)];g.fillStyle=t===T.WATER&&x<=37&&y<=17?'#5bb2c4':col[t];g.fillRect(x,y,1.02,1.02)}
-  const hb=HOMES[C().home].b;
-  BLDS.forEach(b=>{g.fillStyle=b.id===hb?'#ff6f61':DISTS[b.dist].c;g.globalAlpha=isOpen(b)||RES.includes(b.type)?1:.45;g.fillRect(b.bx+.15,b.by+.15,b.w-.3,b.d-.3);g.globalAlpha=1});
-  STATIONS.forEach(s=>{g.fillStyle='#fff';g.beginPath();g.arc(s.x+.5,s.y+.5,1.2,0,Math.PI*2);g.fill();g.fillStyle='#2e8b57';g.beginPath();g.arc(s.x+.5,s.y+.5,.8,0,Math.PI*2);g.fill()});
-  storyPins().forEach(id=>{const b=bld(id);if(!b)return;g.fillStyle='#ffc857';g.beginPath();g.arc(b.door[0]+.5,b.door[1]+.5,1.4,0,Math.PI*2);g.fill();g.strokeStyle='#3a2400';g.lineWidth=.3;g.stroke()});
-  S.quests.forEach(q=>{if(q.done||!q.b)return;const pt=bld(q.b).door;g.fillStyle='#7be0ff';g.beginPath();g.arc(pt[0]+.5,pt[1]+.5,1.2,0,Math.PI*2);g.fill()});
-  S.people.forEach(p=>{if(p.appt&&p.appt.day===S.day){const b=bld(p.appt.b);if(b){g.fillStyle='#ff8fb8';g.beginPath();g.arc(b.door[0]+.5,b.door[1]+.5,1.2,0,Math.PI*2);g.fill()}}});
-  g.font='700 2.1px Figtree, sans-serif';g.textAlign='center';[['cp',19,9],['fa',50,9],['ts',12,25],['gv',8,50],['ct',38,36],['ws',52,56]].forEach(([d,x,y])=>{g.fillStyle='rgba(0,0,0,.55)';g.fillText(DISTS[d].n,x+.1,y+.1);g.fillStyle='#fff';g.fillText(DISTS[d].n,x,y)});
-  const pp=curPos();g.fillStyle='#fff';g.beginPath();g.arc(pp[0],pp[1],1.5,0,Math.PI*2);g.fill();g.fillStyle='#ff3b6b';g.beginPath();g.arc(pp[0],pp[1],1,0,Math.PI*2);g.fill();
-  cvm.onclick=e=>{const r=cvm.getBoundingClientRect(),x=(e.clientX-r.left)/MAPS,y=(e.clientY-r.top)/MAPS;const b=BLDS.find(b=>x>=b.bx-.5&&x<=b.bx+b.w+.5&&y>=b.by-.5&&y<=b.by+b.d+.5);if(b)mapInfo(b);else{const s=STATIONS.find(s=>Math.abs(s.x-x)<2&&Math.abs(s.y-y)<2);if(s)mapInfo(null,s)}};
-}
-function mapInfo(b,st){const c=C(),pt=b?b.door:[st.x,st.y],pp=curPos(),dist=Math.abs(pt[0]-pp[0])+Math.abs(pt[1]-pp[1]),fare=Math.round(5+dist*.35);
-  const near=STATIONS.slice().sort((a,z)=>Math.abs(a.x-pt[0])+Math.abs(a.y-pt[1])-Math.abs(z.x-pt[0])-Math.abs(z.y-pt[1]))[0];
-  const res=b&&RES.includes(b.type),go=()=>{if(S.where)leaveBuilding();S.tab='city';refreshUI()};
-  modal({t:b?b.n:'Metro: '+st.n,sub:b?(res?(HOMES[c.home].b===b.id?'Tavas mājas':'Dzīvojamā ēka'):`${DISTS[b.dist].n} · ${isOpen(b)?'Atvērts':'Slēgts'} · ${hstr(b.hours[0])}–${hstr(b.hours[1])}`):DISTS[st.d].n,ch:[
-    {l:'Iet turp',s:`~${Math.round(dist*.6)} min kājām`,fn:()=>{go();goTo(pt[0],pt[1],b?{type:'door',id:b.id}:null)}},
-    {l:'Dzeltenais taksometrs',s:`${usd(fare)} · ${Math.round(6+dist*.2)} min`,dis:c.money<fare,fn:()=>{c.money-=fare;advance(Math.round(6+dist*.2));go();travelTo(pt[0],pt[1],'taxi',b?b.n:st.n);toast(`Taksometrs aizved tevi līdz: ${b?b.n:st.n}`)}},
-    {l:'Metro',s:`$3 · 12 min · stacija „${near.n}”`,dis:c.money<3,fn:()=>{c.money-=3;advance(12);go();travelTo(near.x,near.y,'metro',near.n);if(b)goTo(pt[0],pt[1],{type:'door',id:b.id});toast(`Metro: ${near.n}`)}},
-    {l:'Aizvērt',exit:true}]})}
+/* ---------- Manhetenas karte ---------- */
+const ISLAND=[[33,0],[60,0],[66,16],[72,36],[80,58],[88,82],[84,96],[66,99],[50,95],[34,88],[18,80],[12,66],[18,44],[26,22]];
+function drawMapCanvas(cvm){const N=200;cvm.width=N;cvm.height=N;const g=cvm.getContext('2d');g.imageSmoothingEnabled=false;const k=N/100;
+  g.fillStyle='#2d6f9e';g.fillRect(0,0,N,N);g.fillStyle='#3a82b2';for(let y=0;y<N;y+=6)for(let x=(y/6%2)*4;x<N;x+=9)g.fillRect(x,y,3,1);
+  g.fillStyle='#6a8a52';g.fillRect(0,0,22,N);g.fillRect(N-18,0,18,N*.7);
+  g.beginPath();ISLAND.forEach(([x,y],i)=>i?g.lineTo(x*k,y*k):g.moveTo(x*k,y*k));g.closePath();g.fillStyle='#2a2238';g.fill();g.save();g.clip();
+  g.fillStyle='#cfc6b4';g.fillRect(0,0,N,N);
+  const D={gv:'#e9b96e',ts:'#ff7ab8',fa:'#c9a7ff',cp:'#5fbf68',ct:'#ff8f6b',ws:'#7fc8ff'};
+  [['gv',8,56,40,32],['ts',30,38,24,16],['fa',44,20,30,30],['ct',44,62,26,18],['ws',52,78,40,22]].forEach(([d,x,y,w,h])=>{g.fillStyle=D[d];g.globalAlpha=.55;g.fillRect(x*k,y*k,w*k,h*k);g.globalAlpha=1});
+  g.fillStyle='#4fa85a';g.fillRect(28*k,2*k,24*k,22*k);g.fillStyle='#3d7fb0';g.fillRect(38*k,6*k,8*k,5*k);g.fillStyle='#7fcf7a';for(let i=0;i<40;i++)g.fillRect((29+((i*37)%22))*k,(3+((i*53)%20))*k,2,2);
+  g.fillStyle='rgba(60,50,70,.35)';for(let y=0;y<N;y+=8)g.fillRect(0,y,N,1);for(let x=0;x<N;x+=13)g.fillRect(x,0,1,N);
+  g.fillStyle='rgba(255,230,120,.7)';g.save();g.translate(30*k,0);g.rotate(.32);g.fillRect(0,0,2,N*1.2);g.restore();
+  g.restore();g.strokeStyle='#16111e';g.lineWidth=2;g.beginPath();ISLAND.forEach(([x,y],i)=>i?g.lineTo(x*k,y*k):g.moveTo(x*k,y*k));g.closePath();g.stroke();
+  g.fillStyle='#16111e';g.font='8px "Pixelify Sans",monospace';g.fillText('HADSONA UPE',4,N-6);g.fillText('ĪSTRIVERA',N-58,N*.5)}
+function scenePeople(id){const h=hourNow();return S.people.filter(p=>p.met&&p.id!==S.comp&&(()=>{const l=locOf(p,h);if(l==='street')return sceneOfPerson(p)===id;if(l==='home'||l==='gone')return false;return SCENE_OF[l]===id})())}
+function openMap(mode,focus){if(!S||!S.c)return;const ov=$('#mapov');const cur=S.where?(SCENE_OF[S.where.b]||S.scene):S.scene;const pins=storyPins().map(b=>SCENE_OF[b]);
+  const appt=S.people.filter(p=>p.appt&&p.appt.day===S.day).map(p=>SCENE_OF[p.appt.b]);const qs=S.quests.filter(q=>!q.done&&q.b).map(q=>SCENE_OF[q.b]);
+  ov.innerHTML=`<div class="mtop"><b>Manhetena</b><span>${clockStr()} · ${usd(C().money)}</span><button class="mx" aria-label="Aizvērt karti">✕</button></div>
+  <div class="mbox"><canvas class="mcv"></canvas>${Object.entries(SCENES).map(([id,sc])=>{const ppl=scenePeople(id).length;return `<button class="mpin ${id===cur?'here':''} ${sc.station?'st':''}" data-s="${id}" style="left:${sc.mx}%;top:${sc.my}%"><i>${id===cur?'★':sc.station?'M':'•'}</i><span>${esc(sc.n)}${pins.includes(id)?' ⭐':''}${appt.includes(id)?' ❤':''}${qs.includes(id)?' ❗':''}${ppl?` 👤${ppl}`:''}</span></button>`}).join('')}</div>
+  <div class="mpanel" id="mpanel"><p class="muted small">${mode==='metro'?'Izvēlies metro staciju (M).':mode==='taxi'?'Izvēlies, kurp vest taksometram.':'Pieskaries vietai kartē.'}</p></div>`;
+  ov.hidden=false;drawMapCanvas(ov.querySelector('.mcv'));
+  ov.querySelector('.mx').onclick=closeMap;
+  ov.querySelectorAll('.mpin').forEach(b=>b.onclick=()=>mapPanel(b.dataset.s,cur));
+  if(focus)mapPanel(focus,cur)}
+function closeMap(){const ov=$('#mapov');ov.hidden=true;ov.innerHTML=''}
+function mapPanel(id,cur){const sc=SCENES[id],c=C(),pnl=$('#mpanel');$('#mapov').querySelectorAll('.mpin').forEach(b=>b.setAttribute('aria-pressed',b.dataset.s===id));
+  const blds=[...sc.back,...sc.left].filter(x=>x[0]).map(x=>bld(x[0])).filter(b=>!RES.includes(b.type)||b.id===HOMES[c.home].b);
+  const ppl=scenePeople(id),fare=taxiFare(id),here=id===cur,nb=SCENES[cur].exits.includes(id),mins=Math.round(8+Math.hypot(SCENES[cur].mx-sc.mx,SCENES[cur].my-sc.my)*.25);
+  const go=(kind,cost,min,lab)=>{if(c.money<cost)return toast('Nepietiek naudas.');c.money-=cost;if(kind!=='walk')advance(min);closeMap();travelScene(id,kind,lab);toast(`${kind==='metro'?'🚇 Metro':kind==='taxi'?'🚕 Taksometrs':'🚶'} → ${sc.n}`)};
+  pnl.innerHTML=`<div class="mh"><b>${esc(sc.n)}</b><span>${esc(DISTS[sc.d].n)}${sc.station?` · Ⓜ ${esc(sc.station)}`:''}</span></div>
+   <div class="mpl">${blds.map(b=>`<span class="${isOpen(b)||RES.includes(b.type)?'':'cl'}">${b.id===HOMES[c.home].b?'🏠 ':''}${esc(b.n)}</span>`).join('')||'<span>Parks</span>'}</div>
+   ${ppl.length?`<div class="mpp">${ppl.slice(0,8).map(p=>`<img src="${portraitURL(p.look,p.sex,null)}" alt="${esc(p.first)}" title="${esc(p.first)}">`).join('')}<span>${ppl.map(p=>esc(p.first)).slice(0,5).join(', ')}</span></div>`:''}
+   <div class="mbt">${here?'<span class="muted small">Tu esi šeit.</span>':`${nb?'<button class="btn" data-g="walk">🚶 Kājām<small>12 min</small></button>':''}${sc.station&&SCENES[cur].station?`<button class="btn" data-g="metro" ${c.money<3?'disabled':''}>🚇 Metro<small>$3 · ${Math.max(10,mins-4)} min</small></button>`:''}<button class="btn gold" data-g="taxi" ${c.money<fare?'disabled':''}>🚕 Taksometrs<small>${usd(fare)} · ${mins} min</small></button>`}</div>
+   ${!here&&sc.station&&!SCENES[cur].station?'<p class="muted small">Metro: vispirms aizej līdz ielai ar staciju (M).</p>':''}`;
+  pnl.querySelectorAll('[data-g]').forEach(b=>b.onclick=()=>{const k=b.dataset.g;if(k==='walk')go('walk',0,12);else if(k==='metro')go('metro',3,Math.max(10,mins-4),sc.station);else go('taxi',fare,mins,sc.n)})}
 
 /* ---------- Es ---------- */
 function renderMe(){
@@ -158,9 +190,9 @@ document.querySelectorAll('nav.tabs button').forEach(b=>b.onclick=()=>{if(!S||!S
 $('#zin').onclick=()=>setZoom(ZOOM*1.15);$('#zout').onclick=()=>setZoom(ZOOM/1.15);
 $('#sleepBtn').onclick=()=>endDayPrompt();
 $('#exitBtn').onclick=()=>{if(S.where&&!$('#modalRoot').innerHTML)goTo(ROOM.exit[0],ROOM.exit[1],{type:'exit'})};
-$('#mapBtn').onclick=()=>{S.tab='phone';S.phoneTab='map';refreshUI()};
+$('#mapBtn').onclick=()=>{S.tab='city';refreshUI();openMap()};
 $('#compChip').onclick=()=>{dismissComp();refreshUI()};
-window.addEventListener('resize',()=>{resizeCanvas();if(S&&S.tab==='phone'&&S.phoneTab==='map')drawMap()});
+window.addEventListener('resize',()=>{resizeCanvas()});
 
 /* ---------- Sākums ---------- */
 function startScreen(){
@@ -190,8 +222,8 @@ function startScreen(){
     previewPerson(pc,{skin,hair,hairC,beard:sex==='m'&&beard,top:{t:sex==='f'?'tank':'tee',c:shirt},bot:{t:sex==='f'?'skirt':'jeans',c:sex==='f'?'#2c3150':'#1f3d6b'},shoe:'#f4f4f4',acc:null},sex);
     $('#go').onclick=()=>{const n=($('#fn').value||first).trim().slice(0,16)||first;$('#modalRoot').innerHTML='';
       newGame({first:n,sex,shirt,skin,hair,hairC,beard:sex==='m'&&beard,st:Object.assign({},st)});S.tab='city';
-      const s0=STATIONS.find(s=>s.d==='gv'),t0=adjFree(CITY,s0.x,s0.y)||[s0.x,s0.y];P.x=t0[0]+.5;P.y=t0[1]+.5;S.where=null;ROOM=null;S.lastDist='gv';initCars();spawnCity();cam.init=false;refreshUI();save();
-      modal({t:'Laipni lūgts Ņujorkā!',b:`<p>Pieskaries zemei, lai ietu. Pieskaries ēkai, lai ieietu, vai cilvēkam, lai runātu. Iekštelpās pieskaries priekšmetiem — letēm, galdiem, gultai.</p><p>Vispirms dodies uz <b>Blīkera ielu 14</b> (sarkanā zīme „Mājas”), kur tevi gaida brālis. Telefonā ir kontakti, ziņas, uzdevumi un Manhetenas karte ar metro.</p><p class="muted">Pulkstenis iet pats. Ēd 🍎, guli zZ, ej dušā 🚿 un uz tualetes WC!</p>`,ch:[{l:'Sākt'}]})};
+      S.scene='gv1';S.where=null;ROOM=null;const m0=SCN(),s0=m0.objs.find(o=>o.k==='subway'),t0=(s0&&adjFree(m0,s0.x,s0.y))||[3,4];P.x=t0[0]+.5;P.y=t0[1]+.5;spawnCity();cam.init=false;refreshUI();save();
+      modal({t:'Laipni lūgts Ņujorkā!',b:`<p>Pieskaries zemei, lai ietu. Pieskaries ēkai, lai ieietu, vai cilvēkam, lai runātu. Iekštelpās pieskaries priekšmetiem — letēm, galdiem, gultai.</p><p>Vispirms dodies uz <b>Blīkera ielu 14</b> (sarkanā zīme „Mājas”), kur tevi gaida brālis. Ielas malās ir bultas uz kaimiņu ielām, bet pogā <b>Karte</b> vari braukt ar taksometru vai metro.</p><p class="muted">Pulkstenis iet pats. Ēd 🍎, guli zZ, ej dušā 🚿 un uz tualetes WC!</p>`,ch:[{l:'Sākt'}]})};
   };
   draw();
 }
@@ -210,8 +242,8 @@ function boot(){
   if(!load())S=null;
   if(!S||!S.c){S=null;startScreen()}
   else{if(!S.msgs)S.msgs=[];initCars();
-    if(S.where){const b=bld(S.where.b);ROOM=makeRoom(b,S.where.variant);P.x=ROOM.exit[0]+.5;P.y=ROOM.exit[1]+.5;spawnRoom()}
-    else{if(S.pos){P.x=S.pos[0];P.y=S.pos[1]}else{const hb=bld(HOMES[C().home].b);P.x=hb.door[0]+.5;P.y=hb.door[1]+.5}spawnCity()}
+    if(S.where){const b=bld(S.where.b);S.scene=SCENE_OF[b.id]||S.scene||'gv1';ROOM=makeRoom(b,S.where.variant);P.x=ROOM.exit[0]+.5;P.y=ROOM.exit[1]+.5;spawnRoom()}
+    else{if(!S.scene)S.scene='gv1';if(S.pos&&SCN().walk(Math.floor(S.pos[0]),Math.floor(S.pos[1]))){P.x=S.pos[0];P.y=S.pos[1]}else{P.x=3.5;P.y=4.5}spawnCity()}
     S.lastHour=Math.floor(hourNow());refreshUI();if(S.over)showEnding(S.flags.ended?'lease':'broke')}
   requestAnimationFrame(frame);
 }

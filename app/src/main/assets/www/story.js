@@ -67,7 +67,7 @@ function storyDay(){const F=S.flags;
 }
 function storyHour(){if(!S||!S.c||S.over||$('#modalRoot').innerHTML||MG_ON)return;const F=S.flags,h=hourNow(),c=C();
   // Čeisa glābšana Čainataunā
-  if(!F.savedActor&&S.day>=10&&!S.where&&h>=21&&F.rescueDay!==S.day&&distAt(Math.floor(P.x),Math.floor(P.y))==='ct'){F.rescueDay=S.day;const star=sp('star'),cop=sp('cop');
+  if(!F.savedActor&&S.day>=10&&!S.where&&h>=21&&F.rescueDay!==S.day&&S.scene==='ct'){F.rescueDay=S.day;const star=sp('star'),cop=sp('cop');
     modal({t:'Uzbrukums Čainataunā!',b:'<p>Tumšā alejā huligāns <b>Vinijs „Nazis”</b> ir piespiedis pie sienas vīrieti saulesbrillēs. „Pulksteni un maku, zvaigznīt!” Tas ir… kinozvaigzne <b>Čeiss Maksvels</b>!</p>',ch:[
       {l:'Iejaukties ar dūrēm',s:`Spēks ${Math.floor(c.st.strength)} (labāk 50+)`,fn:()=>{if(rnd()<(c.st.strength>=50?.9:.25+c.st.strength/200))rescued('fight');else{addSt('health',-10);const m=Math.min(c.money,R(20,60));c.money-=m;star.f=cl(star.f+8,0,FMAX);cut('Sakāve',`<p>Vinijs tev iesit un aizbēg ar ${usd(m)} no tavas kabatas. Čeiss pateicas par drosmi un pazūd taksometrā.</p><p class="muted">Varbūt citu nakti… ar vairāk muskuļiem.</p>`)}}},
       ...(c.st.crime>=25?[{l:'Iebiedēt huligānu',s:`Noziedzīgums ${Math.floor(c.st.crime)}`,fn:()=>{addSt('crime',4);rescued('bully')}}]:[]),
@@ -76,7 +76,7 @@ function storyHour(){if(!S||!S.c||S.over||$('#modalRoot').innerHTML||MG_ON)retur
   // zvaigzne aizsauc prom no mīļotā
   const cp=compP();if(cp&&cp.steady&&F.filmset&&!F.callAway&&rnd()<.25&&h>=18){F.callAway=1;
     modal({t:'Zvans no Čeisa',b:`<p>„Tūlīt vajag tevi „Plaza” — preses konference! Mārvins arī būs!” ${esc(cp.first)} skatās uz tevi ar cerību acīs…</p>`,ch:[
-      {l:'Steigties uz „Plaza”',s:`+slava · ${cp.first} būs vīlies`,fn:()=>{addFame(4);const s=sp('star');s.f=cl(s.f+8,0,FMAX);cp.rom=cl(cp.rom-30,0,FMAX);cp.f=cl(cp.f-10,0,FMAX);dismissComp(true);if(cp.rom<40){cp.steady=0;log(`${cp.first} tevi pamet: „Tev vienmēr svarīgāks ir Čeiss!”`,'b')}const b=bld('plaza');travelTo(b.door[0],b.door[1]+0);toast('Tu esi pie „Plaza”.')}},
+      {l:'Steigties uz „Plaza”',s:`+slava · ${cp.first} būs vīlies`,fn:()=>{addFame(4);const s=sp('star');s.f=cl(s.f+8,0,FMAX);cp.rom=cl(cp.rom-30,0,FMAX);cp.f=cl(cp.f-10,0,FMAX);dismissComp(true);if(cp.rom<40){cp.steady=0;log(`${cp.first} tevi pamet: „Tev vienmēr svarīgāks ir Čeiss!”`,'b')}travelScene('fa2','taxi','Plaza');toast('Tu esi pie „Plaza”.')}},
       {l:`Palikt ar ${nAcc(cp.first)}`,s:'Čeiss apvainosies',fn:()=>{const s=sp('star');s.f=cl(s.f-15,0,FMAX);bond(cp,5,10);toast(`${cp.first} tevi apskauj.`)}}]})}
 }
 function rescued(how){const F=S.flags,star=sp('star');F.savedActor=1;star.met=1;star.phone=1;star.f=Math.max(star.f,62);addFame(8);

@@ -1,6 +1,6 @@
 /* ===================== Stāvoklis ===================== */
 let S=null;
-const KEY='lielais_abols_v1';
+const KEY='lielais_abols_v2';
 function save(){try{if(S&&S.c)localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 function load(){try{const t=localStorage.getItem(KEY);if(t){S=JSON.parse(t);return true}}catch(e){}return false}
 const C=()=>S.c;
@@ -97,7 +97,7 @@ function genSched(p){
 }
 function locOf(p,h){if(p.appt&&p.appt.day===S.day&&h>=p.appt.from&&h<p.appt.until)return p.appt.b;let l='street';for(const s of p.sched||[])if(s.h<=h)l=s.l;return l}
 function newGame(o){
-  S={day:1,uid:100,tab:'city',min:0,log:[],people:[],msgs:[],quests:[],trophies:[],flags:{shifts:0,dates:0},fame:0,speed:2,where:null,pos:null,story:{}};
+  S={day:1,uid:100,tab:'city',min:0,log:[],people:[],msgs:[],quests:[],trophies:[],flags:{shifts:0,dates:0},fame:0,speed:2,where:null,pos:null,scene:'gv1',story:{}};
   S.c={first:o.first,sex:o.sex,skin:o.skin,hair:{s:o.hair,c:o.hairC},st:Object.assign({beauty:0,health:0,humor:0,culture:0,strength:5,crime:0},o.st),
     needs:{food:80,energy:85,hygiene:90,bladder:80},money:600,beard:!!o.beard,home:0,furn:{},fridge:2,inv:{avize:1},wardrobe:[],eq:{top:0,bot:1,shoe:2,acc:-1},job:null,mom:0};
   const c=S.c;

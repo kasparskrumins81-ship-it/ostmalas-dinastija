@@ -1,12 +1,6 @@
-/* ===================== Manhetenas karte ===================== */
-const W=64,H=64,ROADS=[9,19,29,39,49];
-const BR=[[0,7],[12,17],[22,27],[32,37],[42,47],[52,58]];
+/* ===================== Manhetenas ielu ekrāni (Miami Nights stilā) ===================== */
 const T={GRASS:0,ROAD:1,WALK:2,WATER:3,LOT:4,PLAZA:5,BLD:6,PROM:7,PIER:8,PARK:9,PATH:10,TSQ:11};
 const DISTS={cp:{n:'Centrālparks',c:'#46b06b'},fa:{n:'Piektā avēnija',c:'#d8b45a'},ts:{n:'Taimskvērs',c:'#ff4fa3'},gv:{n:'Grīnvičvilidža',c:'#ff8a5c'},ct:{n:'Čainataun',c:'#e2303a'},ws:{n:'Volstrīta',c:'#3f7fd8'}};
-const DMAP=[['cp','cp','cp','cp','fa','fa'],['cp','cp','cp','cp','fa','fa'],['ts','ts','ts','fa','fa','fa'],['gv','gv','ts','ct','ct','ws'],['gv','gv','gv','ct','ws','ws'],['gv','gv','ct','ws','ws','ws']];
-const bIdx=v=>v<10?0:v<20?1:v<30?2:v<40?3:v<50?4:5;
-function distAt(x,y){if(x<=37&&y<=17)return 'cp';return DMAP[bIdx(Math.max(0,Math.min(63,y)))][bIdx(Math.max(0,Math.min(63,x)))]}
-// tips → izskats un darba laiks (stundas pēc 24 = nākamā nakts)
 const BT={
   museum:{style:'classic',hours:[12,20],wall:'#efe7d6',acc:'#9b2335'},apt5:{style:'deco',hours:[0,30],wall:'#e9dcc5',acc:'#7a5a36'},hotel:{style:'deco',hours:[0,30],wall:'#f1e8d6',acc:'#c9a227'},
   opera:{style:'classic',hours:[12,24],wall:'#f2ede2',acc:'#9b2335'},boutique:{style:'shop',hours:[12,21],wall:'#f7e6d8',acc:'#2b2f3a'},salon:{style:'shop',hours:[12,20],wall:'#e3f4f7',acc:'#ff4fa3'},
@@ -26,106 +20,61 @@ const BT={
   seaport:{style:'hut',hours:[12,25],wall:'#e6f1f7',acc:'#2b6cb0'},boathouse:{style:'hut',hours:[12,21],wall:'#e9dcc2',acc:'#2e5e3a'}
 };
 const APTWALL=['#9c5a44','#8a4b3a','#a8654a','#7a4436','#b0705a','#94523e'];
-// [id, tips, nosaukums, bloks i, bloks j, rx, ry, w, d, h, durvju puse, nobīde]  (i<0: absolūtās koordinātas)
-const BLD_SPEC=[
-  // Centrālparks
-  ['boathouse','boathouse','Laivu māja',-1,-1,20,10,3,2,40,'y',1],
-  // Piektā avēnija
-  ['met','museum','Metropolitēna muzejs',4,0,0,2,6,6,120,'y',3],['apt_fa','apt5','Piektās avēnijas nams',5,0,1,0,6,8,250,'x',4],
-  ['plaza','hotel','Viesnīca „Plaza”',4,1,0,0,6,6,200,'y',3],['lincoln','opera','Linkolna centrs',5,1,0,0,7,6,110,'y',3],
-  ['boutique','boutique','Butiks „Avēnija”',3,2,0,0,3,6,96,'y',1],['salon','salon','Stila salons',3,2,3,2,3,4,62,'y',1],
-  ['empire','empire','Empīra Steita ēka',4,2,1,1,4,5,500,'y',2],['dept','dept','Universālveikals „Mega”',5,2,0,0,4,6,130,'y',2],['luxe','luxe','Juvelieri „Dimants”',5,2,4,2,3,4,72,'y',1],
-  // Taimskvērs
-  ['theater','theater','Brodvejas teātris',0,2,0,0,8,6,120,'y',4],['club','club','Naktsklubs „Supernova”',1,2,0,0,6,6,150,'y',3],
-  ['arcade','arcade','Spēļu zāle „Pikselis”',2,2,0,0,6,2,210,'y',3],['pizza','pizza','Picērija „Rejs”',2,3,0,3,3,3,60,'y',1],['cinema','cinema','Kinoteātris „Ekrāns”',2,3,3,0,3,6,110,'y',1],
-  // Grīnvičvilidža
-  ['home','apt_home','Blīkera iela 14',0,3,0,1,4,5,96,'y',2],['deli','deli','Bodega „Uz stūra”',0,3,4,3,4,3,50,'y',2],
-  ['cafe','cafe','Kafejnīca „Kafija & Co”',1,3,0,3,3,3,56,'y',1],['flowers','flowers','Ziedi un dāvanas',1,3,3,2,3,4,52,'y',1],
-  ['pub','pub','Bārs „Vecā pīpe”',0,4,0,2,4,4,62,'y',2],['comedy','comedy','Komēdijas pagrabs',0,4,4,1,4,5,72,'y',2],
-  ['gallery','gallery','Galerija „Bohēma”',1,4,0,1,3,5,70,'y',1],['records','records','Mūzikas veikals „Vinils”',1,4,3,3,3,3,52,'y',1],
-  ['gym','gym','Sporta klubs „Titāns”',2,4,0,0,4,6,90,'y',2],['loft','apt_loft','Lofts Hjūstonas ielā',2,4,4,0,2,6,150,'y',1],
-  ['jazz','jazz','Džeza klubs „Zilā nots”',0,5,0,0,4,7,72,'y',2],['apt_gv2','apt','Brūnakmens nams',0,5,4,2,4,5,100,'y',2],
-  ['police','police','6. policijas iecirknis',1,5,0,1,3,6,82,'y',1],['apt_gv3','apt','Mortona ielas nams',1,5,3,1,3,6,120,'y',1],
-  // Čainataun
-  ['dimsum','dimsum','Restorāns „Zelta pūķis”',3,3,0,1,4,5,72,'y',2],['market','market','Ķīniešu tirgus',3,3,4,2,2,4,50,'y',1],
-  ['kungfu','kungfu','Kung-fu skola „Tīģeris”',4,3,0,0,3,6,82,'y',1],['massage','massage','Masāžas salons „Lotoss”',4,3,3,2,3,4,60,'y',1],
-  ['karaoke','karaoke','Karaoke bārs „Mēness”',3,4,0,2,3,4,70,'y',1],['apt_ct','apt_ct','Čainataunas studija',3,4,3,0,3,6,130,'y',1],
-  ['teahouse','teahouse','Tējnīca „Nefrīts”',2,5,0,3,3,4,52,'y',1],['pawn','pawn','Lombards',2,5,3,2,3,5,62,'y',1],
-  // Volstrīta
-  ['bank','bank','Manhetenas banka',5,3,0,0,7,6,150,'y',3],['nyse','nyse','Ņujorkas birža',4,4,0,0,6,6,124,'y',3],
-  ['office','office','Volstrīta 1',5,4,0,0,5,6,330,'y',2],['realty','realty','Nekustamie īpašumi',5,4,5,2,2,4,60,'y',1],
-  ['diner','diner','Ēstuve „Vērsis”',3,5,0,3,3,4,56,'y',1],['tower2','office','Finanšu tornis',3,5,3,0,3,7,280,'y',1],
-  ['penthouse','apt_pent','Volstrītas penthauss',4,5,0,0,4,7,380,'y',2],['seaport','seaport','Restorāns „Pīrs 17”',5,5,0,2,4,5,60,'y',2],['apt_ws','apt','Ūdensmalas nams',5,5,4,0,3,7,170,'y',1]
+// [id, tips, nosaukums, fasādes augstums]
+const BLD_LIST=[
+  ['boathouse','boathouse','Laivu māja',70],['met','museum','Metropolitēna muzejs',150],['apt_fa','apt5','Piektās avēnijas nams',220],['plaza','hotel','Viesnīca „Plaza”',220],['lincoln','opera','Linkolna centrs',150],
+  ['boutique','boutique','Butiks „Avēnija”',130],['salon','salon','Stila salons',110],['empire','empire','Empīra Steita ēka',330],['dept','dept','Universālveikals „Mega”',170],['luxe','luxe','Juvelieri „Dimants”',130],
+  ['theater','theater','Brodvejas teātris',190],['club','club','Naktsklubs „Supernova”',200],['arcade','arcade','Spēļu zāle „Pikselis”',220],['pizza','pizza','Picērija „Rejs”',110],['cinema','cinema','Kinoteātris „Ekrāns”',180],
+  ['home','apt_home','Blīkera iela 14',150],['deli','deli','Bodega „Uz stūra”',100],['cafe','cafe','Kafejnīca „Kafija & Co”',110],['flowers','flowers','Ziedi un dāvanas',100],['pub','pub','Bārs „Vecā pīpe”',130],['comedy','comedy','Komēdijas pagrabs',140],
+  ['gallery','gallery','Galerija „Bohēma”',120],['records','records','Mūzikas veikals „Vinils”',110],['gym','gym','Sporta klubs „Titāns”',140],['loft','apt_loft','Lofts Hjūstonas ielā',190],['jazz','jazz','Džeza klubs „Zilā nots”',130],['apt_gv2','apt','Brūnakmens nams',150],
+  ['police','police','6. policijas iecirknis',140],['apt_gv3','apt','Mortona ielas nams',160],
+  ['dimsum','dimsum','Restorāns „Zelta pūķis”',120],['market','market','Ķīniešu tirgus',100],['kungfu','kungfu','Kung-fu skola „Tīģeris”',130],['massage','massage','Masāžas salons „Lotoss”',110],['karaoke','karaoke','Karaoke bārs „Mēness”',120],['apt_ct','apt_ct','Čainataunas studija',170],
+  ['teahouse','teahouse','Tējnīca „Nefrīts”',100],['pawn','pawn','Lombards',110],
+  ['bank','bank','Manhetenas banka',190],['nyse','nyse','Ņujorkas birža',180],['office','office','Volstrīta 1',240],['realty','realty','Nekustamie īpašumi',110],['diner','diner','Ēstuve „Vērsis”',100],['tower2','office','Finanšu tornis',230],
+  ['penthouse','apt_pent','Volstrītas penthauss',240],['seaport','seaport','Restorāns „Pīrs 17”',90],['apt_ws','apt','Ūdensmalas nams',190]
 ];
-const BLDS=[];
-const grid=new Uint8Array(W*H), blockG=new Uint8Array(W*H);
-const gi=(x,y)=>y*W+x, inB=(x,y)=>x>=0&&y>=0&&x<W&&y<H;
-const DECO=[]; let LAMPS=[], STATIONS=[], CITY_OBJS=[];
-function buildCity(){
-  const rr=mulberry(1905);
-  grid.fill(T.LOT);
-  for(let i=0;i<59;i++)for(const r of ROADS)for(const k of [r,r+1]){grid[gi(i,k)]=T.ROAD;grid[gi(k,i)]=T.ROAD}
-  for(let i=0;i<59;i++)for(const r of ROADS)for(const k of [r-1,r+2]){if(grid[gi(i,k)]!==T.ROAD)grid[gi(i,k)]=T.WALK;if(grid[gi(k,i)]!==T.ROAD)grid[gi(k,i)]=T.WALK}
-  for(let y=0;y<H;y++)for(let x=0;x<W;x++){const e=Math.max(x,y);if(e>=61)grid[gi(x,y)]=T.WATER;else if(e===60)grid[gi(x,y)]=T.PROM;else if(e===59)grid[gi(x,y)]=T.WALK}
-  for(let x=61;x<64;x++){grid[gi(x,45)]=T.PIER;grid[gi(x,46)]=T.PIER}
-  for(let y=61;y<64;y++){grid[gi(30,y)]=T.PIER;grid[gi(31,y)]=T.PIER}
-  // Grīnvičas dārziņi
-  for(let y=0;y<59;y++)for(let x=0;x<59;x++)if(grid[gi(x,y)]===T.LOT&&distAt(x,y)==='gv')grid[gi(x,y)]=T.GRASS;
-  // Centrālparks
-  for(let y=0;y<=17;y++)for(let x=0;x<=37;x++){
-    let t=T.PARK;const lk=((x+.5-17.5)/5.2)**2+((y+.5-4.6)/2.7)**2,pd=((x+.5-32.5)/2.6)**2+((y+.5-3.5)/1.7)**2;
-    if(lk<1||pd<1)t=T.WATER;
-    else if(y===13||x===6||x===27||((y===1||y===9)&&x>=10&&x<=25)||((x===10||x===25)&&y>=1&&y<=9)||(x===16&&y>=9))t=T.PATH;
-    if(x>=14&&x<=17&&y>=10&&y<=12)t=T.PLAZA;
-    grid[gi(x,y)]=t}
-  // Taimskvērs
-  for(let y=22;y<=27;y++)for(let x=22;x<=27;x++)grid[gi(x,y)]=T.TSQ;
-  for(let y=52;y<=58;y++)for(let x=46;x<=47;x++)grid[gi(x,y)]=T.PLAZA;
-  BLD_SPEC.forEach(([id,type,n,i,j,rx,ry,w,d,h,side,off],k)=>{
-    const bx=i<0?rx:BR[i][0]+rx,by=j<0?ry:BR[j][0]+ry,meta=BT[type];
-    const door=side==='y'?[bx+off,by+d]:[bx+w,by+off];
-    const b={id,type,n,bx,by,w,d,h,side,door,style:meta.style,hours:meta.hours,wall:meta.wall||APTWALL[k%APTWALL.length],acc:meta.acc||pick(['#2e5e3a','#3b3f4c','#7a2b2b','#2b3a67']),roof:meta.roof,neon:meta.neon,seed:k*13+7,dist:distAt(bx+w/2,by+d/2)};
-    BLDS.push(b);for(let y=by;y<by+d;y++)for(let x=bx;x<bx+w;x++){grid[gi(x,y)]=T.BLD;blockG[gi(x,y)]=1}
-  });
-  const isDoor=(x,y)=>BLDS.some(b=>b.door[0]===x&&b.door[1]===y);
-  const free=(x,y)=>inB(x,y)&&!blockG[gi(x,y)]&&!isDoor(x,y)&&grid[gi(x,y)]!==T.WATER&&grid[gi(x,y)]!==T.ROAD;
-  const addObj=(o,blocks)=>{if(!free(o.x,o.y))return false;CITY_OBJS.push(o);if(blocks)blockG[gi(o.x,o.y)]=1;return true};
-  const near=(x,y,kind)=>{for(let r=0;r<6;r++)for(let dy=-r;dy<=r;dy++)for(let dx=-r;dx<=r;dx++){const a=x+dx,b=y+dy;if(free(a,b)&&grid[gi(a,b)]===kind)return [a,b]}return [x,y]};
-  // objekti parkā
-  addObj({k:'fountain',x:15,y:11,act:'fountain'},true);
-  [[5,12],[9,14],[20,14],[28,6],[28,10],[11,5],[24,3],[3,14],[33,14],[17,14],[7,2],[30,16],[2,8]].forEach(([x,y])=>addObj({k:'bench',x,y,act:'bench'},true));
-  [[7,14],[26,12],[13,16],[24,24],[44,51]].forEach(([x,y])=>addObj({k:'cart',kind:'hotdog',x,y,act:'cart'},true));
-  [[3,12],[4,12]].forEach(([x,y])=>addObj({k:'chess',x,y,act:'chess'},true));
-  [[3,4],[33,8],[35,12],[21,16]].forEach(([x,y])=>addObj({k:'picnic',x,y,act:'picnic'},false));
-  addObj({k:'carriage',x:35,y:16,act:'carriage'},true);
-  addObj({k:'carousel',x:31,y:10,act:'carousel'},true);
-  addObj({k:'jog',x:5,y:16,act:'jog'},true);
-  // koki
-  const tree=(x,y,kind,s)=>{const t=grid[gi(x,y)];if(free(x,y)&&(t===T.GRASS||t===T.PARK))addObj({k:'tree',kind,x,y,s:s||.85+rr()*.35},true)};
-  for(let i=0;i<520;i++){const x=Math.floor(rr()*38),y=Math.floor(rr()*18);if(grid[gi(x,y)]===T.PARK&&rr()<.55)tree(x,y,rr()<.35?'pine':'round')}
-  for(let i=0;i<200;i++){const x=Math.floor(rr()*59),y=Math.floor(rr()*59);if(grid[gi(x,y)]===T.GRASS&&rr()<.4)tree(x,y,'round',.75+rr()*.25)}
-  for(let i=2;i<58;i+=5)for(const r of ROADS){[[i,r-1],[i,r+2],[r-1,i],[r+2,i]].forEach(([x,y])=>{const dd=distAt(x,y);if((dd==='gv'||dd==='fa')&&grid[gi(x,y)]===T.WALK&&free(x,y)&&rr()<.55)CITY_OBJS.push({k:'tree',kind:'round',x,y,s:.7,nb:1})})}
-  // metro stacijas
-  STATIONS=[['cp','59. iela – Centrālparks',13,18],['fa','5. avēnija – 53. iela',44,21],['ts','Taimskvērs – 42. iela',5,21],['gv','Kristofera iela',6,41],['ct','Kanāla iela',35,41],['ws','Volstrīta',55,48]].map(([d,n,x,y])=>{const p=near(x,y,T.WALK);const o={k:'subway',x:p[0],y:p[1],n,d,act:'subway'};addObj(o,true);return o});
-  // taksometri, avīžu kioski, vērsis, Taimskvēra kāpnes
-  [[21,31],[41,21],[48,41],[11,48],[38,38]].forEach(([x,y])=>{const p=near(x,y,T.WALK);addObj({k:'taxi',x:p[0],y:p[1],act:'taxi'},false)});
-  [[18,21],[51,38],[8,38]].forEach(([x,y])=>{const p=near(x,y,T.WALK);addObj({k:'news',x:p[0],y:p[1],act:'news'},true)});
-  addObj({k:'bull',x:46,y:55,act:'bull'},true);
-  addObj({k:'steps',x:24,y:26,act:'steps'},true);addObj({k:'steps',x:25,y:26,act:'steps'},true);
-  // kanalizācijas lūkas ar tvaiku
-  for(let i=0,c=0;i<400&&c<18;i++){const r=pick(ROADS),t=R(1,57),hz=rr()<.5,x=hz?t:r+(rr()<.5?0:1),y=hz?r+(rr()<.5?0:1):t;if(grid[gi(x,y)]!==T.ROAD)continue;if(ROADS.some(q=>(hz?x:y)>=q-1&&(hz?x:y)<=q+2))continue;if(CITY_OBJS.some(o=>o.k==='manhole'&&Math.abs(o.x-x)+Math.abs(o.y-y)<6))continue;CITY_OBJS.push({k:'manhole',x,y,nb:1});c++}
-  // hidranti (dekors)
-  for(let i=4;i<58;i+=9)for(const r of ROADS){const x=i,y=r+2;if(grid[gi(x,y)]===T.WALK&&free(x,y)&&distAt(x,y)!=='cp')CITY_OBJS.push({k:'hydrant',x,y,nb:1})}
-  // laternas
-  for(let i=2;i<58;i+=6)for(const r of ROADS){LAMPS.push({x:i,y:r-1,o:[0,.4]});LAMPS.push({x:r+2,y:i,o:[-.4,0]})}
-  LAMPS=LAMPS.filter(l=>grid[gi(l.x,l.y)]===T.WALK&&!isDoor(l.x,l.y));
-  for(let x=2;x<37;x+=7)LAMPS.push({x,y:13,o:[0,.4]});
-  // tāli orientieri
-  DECO.push({k:'liberty',x:67.5,y:66},{k:'bridge',x:61,y:52.5},{k:'boat',x:62.5,y:40,c:'#f4f4f4'},{k:'boat',x:40,y:62.6,c:'#ffc857'},{k:'rowboat',x:16,y:4.5,c:'#c0643a'},{k:'rowboat',x:20,y:3.5,c:'#3f7fd8'});
-}
-buildCity();
+// ainas: W×H staigājams laukums; back = fasādes pie aizmugures sienas (pa x), left = pie kreisās sienas (pa y); null = koki / margas
+const SW=12,SH=7;
+const SCENES={
+  gv1:{n:'Blīkera iela',d:'gv',floor:'walkB',back:[['home',3],['deli',3],['cafe',3],['flowers',3]],left:[['pub',3],['comedy',2],['apt_gv3',2]],exits:['gv2','ct'],station:'Kristofera iela',mx:24,my:70,
+    decor:[['tree',3,6],['tree',8,6],['lamp',1,6],['lamp',6,6],['hydrant',5,6],['bench',5,4],['news',8,3],['subway',2,4],['taxi',10,6]]},
+  gv2:{n:'Makdugala iela',d:'gv',floor:'walkB',back:[['gallery',3],['records',2],['gym',4],['loft',3]],left:[['jazz',3],['apt_gv2',2],['police',2]],exits:['ts','gv1'],mx:32,my:60,
+    decor:[['tree',2,6],['tree',6,6],['tree',9,6],['bench',4,4],['hydrant',7,3],['lamp',4,6],['lamp',11,6]]},
+  ts:{n:'Taimskvērs',d:'ts',floor:'tsq',back:[['theater',4],['club',4],['arcade',4]],left:[['cinema',4],['pizza',3]],exits:['fa1','gv2'],station:'Taimskvērs – 42. iela',mx:42,my:46,
+    decor:[['steps',5,3],['steps',6,3],['steps',5,4],['steps',6,4],['cart',9,4],['news',2,5],['subway',2,2],['lamp',1,6],['lamp',8,6],['taxi',10,6]]},
+  fa1:{n:'Piektā avēnija',d:'fa',floor:'walkF',back:[['boutique',3],['salon',2],['dept',4],['luxe',3]],left:[['empire',7]],exits:['fa2','ts'],mx:58,my:40,
+    decor:[['tree',3,6],['tree',6,6],['tree',9,6],['news',9,3],['bench',5,4],['lamp',1,6],['lamp',11,6]]},
+  fa2:{n:'Centrālparka dienvidmala',d:'fa',floor:'walkF',back:[['plaza',5],['met',4],['lincoln',3]],left:[['apt_fa',4],[null,3]],exits:['cp','fa1'],station:'5. avēnija – 59. iela',mx:52,my:28,
+    decor:[['fountain',5,4],['carriage',8,5],['bench',2,5],['subway',2,2],['lamp',1,6],['lamp',11,6],['taxi',10,6]]},
+  cp:{n:'Centrālparks',d:'cp',floor:'park',park:1,back:[['boathouse',3],[null,9]],left:[[null,7]],exits:['fa2'],mx:40,my:12,water:[[7,0,5,3]],paths:[[0,4,12,1],[4,0,1,7]],
+    decor:[['fountain',4,4],['bench',1,3],['bench',6,5],['bench',9,5],['chess',1,6],['chess',2,6],['cart',6,3],['carousel',9,3],['jog',11,4],['picnic',7,6],['tree',0,0],['tree',2,1],['tree',10,6],['rowboat',9,1],['rowboat',10.5,.8]],samSpot:[2,3]},
+  ct:{n:'Kanāla iela',d:'ct',floor:'walkC',back:[['dimsum',3],['market',2],['kungfu',3],['massage',2],['teahouse',2]],left:[['karaoke',3],['apt_ct',2],['pawn',2]],exits:['gv1','ws1'],station:'Kanāla iela',mx:56,my:72,lanterns:1,
+    decor:[['news',3,5],['subway',2,3],['hydrant',6,6],['cart',8,4],['lamp',1,6],['lamp',10,6]]},
+  ws1:{n:'Volstrīta',d:'ws',floor:'walk',back:[['nyse',4],['bank',4],['office',4]],left:[['realty',2],['tower2',2],['diner',3]],exits:['ct','ws2'],station:'Volstrīta',mx:62,my:84,
+    decor:[['bull',6,4],['news',9,3],['subway',2,3],['lamp',1,6],['lamp',5,6],['lamp',10,6],['taxi',8,6]]},
+  ws2:{n:'Dienvidu ostas krastmala',d:'ws',floor:'prom',front:'water',back:[['seaport',4],['penthouse',4],['apt_ws',4]],left:[[null,7]],exits:['ws1'],mx:74,my:90,
+    decor:[['bench',3,4],['bench',8,4],['cart',6,2],['lamp',1,6],['lamp',5,6],['lamp',9,6]]}
+};
+const ZONE_SCENES={gv:['gv1','gv2'],ts:['ts'],fa:['fa1','fa2'],cp:['cp'],ct:['ct'],ws:['ws1','ws2']};
+const BLDS=[],SCENE_OF={};
+BLD_LIST.forEach(([id,type,n,h],k)=>{const meta=BT[type];BLDS.push({id,type,n,h,style:meta.style,hours:meta.hours,wall:meta.wall||APTWALL[k%APTWALL.length],acc:meta.acc||pick(['#2e5e3a','#3b3f4c','#7a2b2b','#2b3a67']),roof:meta.roof,neon:meta.neon,seed:k*13+7,dist:'gv'})});
 function bld(id){return BLDS.find(b=>b.id===id)}
-function walkCity(x,y){if(!inB(x,y))return false;const t=grid[gi(x,y)];return t!==T.WATER&&!blockG[gi(x,y)]}
+const inB=(x,y)=>x>=0&&y>=0&&x<SW&&y<SH;
+// ainas karte
+function buildScene(id){const sc=SCENES[id];if(sc._m)return sc._m;
+  const m={kind:'scene',id,sc,W:SW,H:SH,doors:[],objs:[],exits:[],tiles:new Array(SW*SH).fill(sc.floor),block:new Uint8Array(SW*SH)};
+  let u=0;sc.back.forEach(([bid,w])=>{if(bid){const b=bld(bid);b.dist=sc.d;SCENE_OF[bid]=id;const dx=u+Math.floor(w/2);m.doors.push({b,ax:'y',u0:u,len:w,tile:[dx,0],doorU:dx-u+.5})}else m.doors.push({b:null,ax:'y',u0:u,len:w});u+=w});
+  let v=0;sc.left.forEach(([bid,w])=>{if(bid){const b=bld(bid);b.dist=sc.d;SCENE_OF[bid]=id;const dy=v+Math.floor(w/2);m.doors.push({b,ax:'x',u0:v,len:w,tile:[0,dy],doorU:dy-v+.5})}else m.doors.push({b:null,ax:'x',u0:v,len:w});v+=w});
+  (sc.paths||[]).forEach(([x0,y0,w,h])=>{for(let y=y0;y<y0+h;y++)for(let x=x0;x<x0+w;x++)if(inB(x,y))m.tiles[y*SW+x]='path'});
+  (sc.water||[]).forEach(([x0,y0,w,h])=>{for(let y=y0;y<y0+h;y++)for(let x=x0;x<x0+w;x++)if(inB(x,y)){m.tiles[y*SW+x]='lake';m.block[y*SW+x]=1}});
+  sc.decor.forEach(([k,x,y])=>{const o={k,x,y,act:{bench:'bench',cart:'cart',news:'news',subway:'subway',taxi:'taxi',fountain:'fountain',carriage:'carriage',chess:'chess',carousel:'carousel',jog:'jog',picnic:'picnic',bull:'bull',steps:'steps'}[k],kind:k==='cart'?'hotdog':k==='tree'?'round':undefined,s:k==='tree'?.95:undefined,n:sc.station,d:sc.d,c:k==='rowboat'?pick(['#c0643a','#3f7fd8']):undefined};
+    if(k==='rowboat'){m.deco=m.deco||[];m.deco.push(o);return}
+    m.objs.push(o);if(!['lamp','hydrant','picnic','taxi'].includes(k)&&Number.isInteger(x)&&inB(x,y))m.block[y*SW+x]=1});
+  sc.exits.forEach((to,i)=>{const y=sc.exits.length===1?3:i===0?2:5;m.exits.push({to,x:SW-1,y});});
+  m.walk=(x,y)=>inB(x,y)&&!m.block[y*SW+x];
+  m.objs.sort((a,b)=>(a.x+a.y)-(b.x+b.y));
+  return sc._m=m}
+Object.keys(SCENES).forEach(buildScene);
 function bfs(m,sx,sy,tx,ty,maxN=4600){
   const Wm=m.W,Hm=m.H,ok=(x,y)=>m.walk(x,y);
   if(!ok(tx,ty))return null;if(sx===tx&&sy===ty)return [];
@@ -135,7 +84,6 @@ function bfs(m,sx,sy,tx,ty,maxN=4600){
   if(prev[tgt]<0)return null;
   const path=[];let cur=tgt;while(cur!==s){path.push([cur%Wm,(cur/Wm)|0]);cur=prev[cur]}return path.reverse();
 }
-const CITY={kind:'city',W,H,walk:walkCity};
 
 /* ===================== Interjeri ===================== */
 function F(k,x,y,w=1,d=1,o={}){return Object.assign({k,x,y,w,d},o)}

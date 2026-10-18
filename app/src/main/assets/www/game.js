@@ -1,48 +1,41 @@
 /* ===================== Spēles loģika ===================== */
-const P={x:6.5,y:41.5,path:[],target:null,ph:0,dir:0};
+const P={x:3.5,y:4.5,path:[],target:null,ph:0,dir:0};
 let NPCS=[],CARS=[],ROOM=null,COMP_NPC=null,EXTRAS=[],PIGEONS=[];const TARGET={x:0,y:0,t:0};
-const curMap=()=>S.where?ROOM:CITY;
+const curMap=()=>S.where?ROOM:SCN();
+const SCN=()=>buildScene(S.scene||'gv1');
 const RES=['apt','apt5','apt_ct','apt_loft','apt_pent','apt_home'];
 
 /* ---------- Mašīnas ---------- */
-function initCars(){CARS=[];const lanes=[];
-  ROADS.forEach(r=>{const seg=ax=>{let best=[0,0],s=null;for(let i=0;i<=59;i++){const ok=i<59&&(ax==='x'?grid[gi(i,r)]===T.ROAD:grid[gi(r,i)]===T.ROAD);if(ok&&s===null)s=i;if(!ok&&s!==null){if(i-s>best[1]-best[0])best=[s,i];s=null}}return best};
-    const sx=seg('x'),sy=seg('y');lanes.push({ax:'x',c:r+.5,d:1,s0:sx[0],s1:sx[1]},{ax:'x',c:r+1.5,d:-1,s0:sx[0],s1:sx[1]},{ax:'y',c:r+.5,d:-1,s0:sy[0],s1:sy[1]},{ax:'y',c:r+1.5,d:1,s0:sy[0],s1:sy[1]})});
-  const cols=['#e2484f','#f4f4f4','#2b2f3a','#3f7fd8','#46b06b','#9aa3ad','#1f6f8b','#c0c4ca','#7a2b2b'];
-  for(let i=0;i<34;i++){const ln=lanes[i%lanes.length];const taxi=rnd()<.45;CARS.push({ax:ln.ax,dir:ln.d,lane:ln.c,s0:ln.s0,s1:ln.s1,s:ln.s0+rnd()*(ln.s1-ln.s0),v:2+rnd()*1.8,col:taxi?'#ffc61a':pick(cols),taxi,x:0,y:0})}}
-function updCars(dt){CARS.forEach(c=>{c.s+=c.v*dt*c.dir;if(c.s>c.s1-.4)c.s=c.s0+.2;if(c.s<c.s0+.2)c.s=c.s1-.4;if(c.ax==='x'){c.x=c.s;c.y=c.lane}else{c.x=c.lane;c.y=c.s}})}
-
+function initCars(){CARS=[];const sc=SCENES[S.scene||'gv1'];if(sc.front||sc.park)return;const cols=['#e2484f','#f4f4f4','#2b2f3a','#3f7fd8','#46b06b','#9aa3ad','#1f6f8b','#7a2b2b'];
+  for(let i=0;i<5;i++){const d=i%2?-1:1,taxi=rnd()<.45;CARS.push({ax:'x',dir:d,lane:SH+(d>0?.45:1.4),x:-9+rnd()*(SW+18),y:SH+(d>0?.45:1.4),v:2+rnd()*1.6,col:taxi?'#ffc61a':pick(cols),taxi})}}
+function updCars(dt){CARS.forEach(c=>{c.x+=c.v*dt*c.dir;if(c.x>SW+9)c.x=-9;if(c.x<-9)c.x=SW+9;c.y=c.lane})}
 /* ---------- Cilvēki ---------- */
-const ZONE_TILES={};
-(function(){for(let y=0;y<59;y++)for(let x=0;x<61;x++){const t=grid[gi(x,y)];if(!walkCity(x,y)||t===T.ROAD||t===T.PIER)continue;if(BLDS.some(b=>b.door[0]===x&&b.door[1]===y))continue;const d=distAt(x,y);(ZONE_TILES[d]=ZONE_TILES[d]||[]).push([x,y])}})();
 function npcInfo(n){if(n.extra)return {look:n.look,sex:n.sex,person:null};const p=pById(n.pid);if(!p)return {look:randLook('m'),sex:'m',person:null};
   const L=p.cast?p.look:p.look;return {look:L,sex:p.sex,person:p,scale:p.key==='kevin'?.92:1}}
 function mkNpc(p,x,y){return {pid:p.id,x,y,path:[],wait:R(0,3),spd:1.2+rnd()*.5,ph:rnd()*6,dir:R(0,3)}}
-function zoneTile(z,near){const L=ZONE_TILES[z]||ZONE_TILES.gv;if(near){const cand=L.filter(([x,y])=>Math.abs(x-P.x)+Math.abs(y-P.y)<22);if(cand.length&&rnd()<.75)return pick(cand)}return pick(L)}
-function streetPeople(){const h=hourNow();return S.people.filter(p=>p.id!==S.comp&&locOf(p,h)==='street')}
-function placeStreet(p){if(p.spot)return [p.spot[0]+.5,p.spot[1]+.5];const t=zoneTile(p.zone,true);return [t[0]+.5,t[1]+.5]}
+function sceneTile(){const m=SCN();for(let i=0;i<80;i++){const x=R(1,SW-2),y=R(1,SH-1);if(m.walk(x,y)&&!m.exits.some(e=>e.x===x&&e.y===y))return [x,y]}return [5,4]}
+function sceneOfPerson(p){if(p.key==='sam')return 'cp';const L=ZONE_SCENES[p.zone]||['gv1'];return L[Math.floor(hash(p.id,S.day)*L.length)]}
+function streetPeople(){const h=hourNow();return S.people.filter(p=>p.id!==S.comp&&locOf(p,h)==='street'&&sceneOfPerson(p)===S.scene)}
+function placeStreet(p){if(p.key==='sam'){const sp=SCENES.cp.samSpot;return [sp[0]+.5,sp[1]+.5]}const t=sceneTile();return [t[0]+.5,t[1]+.5]}
 function spawnCity(){
-  NPCS=[];streetPeople().forEach(p=>{const [x,y]=placeStreet(p);NPCS.push(mkNpc(p,x,y))});
-  if(S.comp){const p=pById(S.comp);if(p){const t=adjFree(CITY,Math.floor(P.x),Math.floor(P.y))||[Math.floor(P.x),Math.floor(P.y)];COMP_NPC=mkNpc(p,t[0]+.5,t[1]+.5);NPCS.push(COMP_NPC)}}
-  spawnExtras();spawnPigeons();
+  NPCS=[];streetPeople().slice(0,12).forEach(p=>{const [x,y]=placeStreet(p);NPCS.push(mkNpc(p,x,y))});
+  if(S.comp){const p=pById(S.comp);if(p){const t=adjFree(SCN(),Math.floor(P.x),Math.floor(P.y))||[Math.floor(P.x),Math.floor(P.y)];COMP_NPC=mkNpc(p,t[0]+.5,t[1]+.5);NPCS.push(COMP_NPC)}}
+  initCars();spawnExtras();spawnPigeons();
 }
-function spawnExtras(){EXTRAS=[];let n=distAt(Math.floor(P.x),Math.floor(P.y))==='ts'?26:18;if(S.weather==='rain'||S.weather==='snow')n=Math.round(n*.65);if(NIGHT>.5)n=Math.round(n*.75);
-  for(let i=0;i<n;i++){const z=distAt(Math.floor(P.x),Math.floor(P.y));const t=zoneTile(rnd()<.8?z:pick(Object.keys(DISTS)),true);const sex=rnd()<.5?'m':'f';EXTRAS.push({extra:1,look:randLook(sex,S.weather),sex,x:t[0]+.5,y:t[1]+.5,path:[],wait:rnd()*3,spd:1.3+rnd()*.6,ph:rnd()*6,dir:R(0,3)})}}
-const PIG_T=[T.PLAZA,T.TSQ,T.PATH,T.WALK,T.PARK,T.PROM];
-function pigeonFlock(far){let tries=0;while(tries++<60){const x=Math.floor(P.x)+R(-16,16),y=Math.floor(P.y)+R(-16,16);if(!inB(x,y)||!PIG_T.includes(grid[gi(x,y)])||blockG[gi(x,y)])continue;const d=Math.abs(x-P.x)+Math.abs(y-P.y);if(far&&d<9)continue;
-  const n=R(3,6);for(let i=0;i<n;i++)PIGEONS.push({x:x+.2+rnd()*.8,y:y+.2+rnd()*.8,z:0,st:'walk',t:rnd()*2,ph:rnd()*6,fx:rnd()<.5?1:-1,c:pick(['#8e939c','#9aa0aa','#7d828c','#a7a9b0','#6f747e']),vx:0,vy:0});return}}
-function spawnPigeons(){PIGEONS=[];if(S.where||hourNow()>=21.5)return;const k=S.weather==='rain'||S.weather==='snow'?2:5;for(let i=0;i<k;i++)pigeonFlock(false)}
-function updPigeons(dt){if(S.where)return;let fled=0;
-  for(const g of PIGEONS){if(g.st==='walk'){const dp=Math.hypot(g.x-P.x,g.y-P.y);if(dp<1.7||CARS.some(c=>Math.hypot(c.x-g.x,c.y-g.y)<.9)||EXTRAS.some(e=>Math.hypot(e.x-g.x,e.y-g.y)<.5&&rnd()<.02)){g.st='fly';const a=Math.atan2(g.y-P.y,g.x-P.x)+(rnd()-.5);g.vx=Math.cos(a)*(2.5+rnd());g.vy=Math.sin(a)*(2.5+rnd());g.fx=g.vx-g.vy>0?1:-1;continue}
-      g.t-=dt;if(g.t<=0){g.t=.4+rnd()*1.6;const nx=g.x+(rnd()-.5)*.6,ny=g.y+(rnd()-.5)*.6;if(inB(Math.floor(nx),Math.floor(ny))&&PIG_T.includes(grid[gi(Math.floor(nx),Math.floor(ny))])){g.fx=(nx-g.x)-(ny-g.y)>0?1:-1;g.x=nx;g.y=ny}}}
+function spawnExtras(){EXTRAS=[];const sc=SCENES[S.scene];let n=sc.d==='ts'?9:sc.park?4:6;if(S.weather==='rain'||S.weather==='snow')n=Math.round(n*.6);if(hourNow()>=23)n=Math.round(n*.6);
+  for(let i=0;i<n;i++){const t=sceneTile();const sex=rnd()<.5?'m':'f';EXTRAS.push({extra:1,look:randLook(sex,S.weather),sex,x:t[0]+.5,y:t[1]+.5,path:[],wait:rnd()*3,spd:1.1+rnd()*.5,ph:rnd()*6,dir:R(0,3)})}}
+function pigeonFlock(){const m=SCN();for(let k=0;k<30;k++){const x=R(1,SW-1),y=R(1,SH-1);if(!m.walk(x,y))continue;const n=R(3,5);for(let i=0;i<n;i++)PIGEONS.push({x:x+.2+rnd()*.8,y:y+.2+rnd()*.8,z:0,st:'walk',t:rnd()*2,ph:rnd()*6,fx:rnd()<.5?1:-1,c:pick(['#8e939c','#9aa0aa','#7d828c','#a7a9b0','#6f747e']),vx:0,vy:0});return}}
+function spawnPigeons(){PIGEONS=[];if(S.where||hourNow()>=21.5)return;const sc=SCENES[S.scene];const k=S.weather==='rain'||S.weather==='snow'?1:(sc.d==='ts'||sc.park||sc.d==='fa'?2:1);for(let i=0;i<k;i++)pigeonFlock()}
+function updPigeons(dt){if(S.where)return;const m=SCN();let fled=0;
+  for(const g of PIGEONS){if(g.st==='walk'){const dp=Math.hypot(g.x-P.x,g.y-P.y);if(dp<1.5||EXTRAS.some(e=>Math.hypot(e.x-g.x,e.y-g.y)<.6)){g.st='fly';const a=Math.atan2(g.y-P.y,g.x-P.x)+(rnd()-.5);g.vx=Math.cos(a)*(2.5+rnd());g.vy=Math.sin(a)*(2.5+rnd());g.fx=g.vx-g.vy>0?1:-1;continue}
+      g.t-=dt;if(g.t<=0){g.t=.4+rnd()*1.6;const nx=g.x+(rnd()-.5)*.6,ny=g.y+(rnd()-.5)*.6;if(m.walk(Math.floor(nx),Math.floor(ny))){g.fx=(nx-g.x)-(ny-g.y)>0?1:-1;g.x=nx;g.y=ny}}}
     else{g.x+=g.vx*dt;g.y+=g.vy*dt;g.z+=70*dt;if(g.z>170){g.dead=1;fled++}}}
-  if(fled){PIGEONS=PIGEONS.filter(g=>!g.dead)}
-  if(hourNow()<21.5&&PIGEONS.length<(S.weather==='rain'||S.weather==='snow'?8:22)&&rnd()<dt*.25)pigeonFlock(true);
-  PIGEONS=PIGEONS.filter(g=>Math.abs(g.x-P.x)+Math.abs(g.y-P.y)<34)}
+  if(fled)PIGEONS=PIGEONS.filter(g=>!g.dead);
+  if(hourNow()<21.5&&PIGEONS.length<6&&rnd()<dt*.05)pigeonFlock()}
 function refreshCityNPCs(){
-  const h=hourNow(),keep=NPCS.filter(n=>{const p=pById(n.pid);return n===COMP_NPC||n.talking||(p&&locOf(p,h)==='street')});
-  const ids=new Set(keep.map(n=>n.pid));NPCS=keep;
-  streetPeople().filter(p=>!ids.has(p.id)).forEach(p=>{const b=BLDS.find(x=>x.id===p.sched.find(s=>s.h<=h)?.l)||null;const pos=b?[b.door[0]+.5,b.door[1]+.5]:placeStreet(p);NPCS.push(mkNpc(p,pos[0],pos[1]))});
+  const h=hourNow(),keep=NPCS.filter(n=>{const p=pById(n.pid);return n===COMP_NPC||n.talking||(p&&locOf(p,h)==='street'&&sceneOfPerson(p)===S.scene)});
+  const ids=new Set(keep.map(n=>n.pid));NPCS=keep;const m=SCN();
+  streetPeople().filter(p=>!ids.has(p.id)).slice(0,Math.max(0,12-NPCS.length)).forEach(p=>{const d=m.doors.find(d=>d.b&&d.b.id===p.sched.filter(s=>s.h<=h-.01).slice(-2)[0]?.l);const e=pick(m.exits);const pos=p.key==='sam'?placeStreet(p):d?[d.tile[0]+.5,d.tile[1]+.5]:[e.x+.5,e.y+.5];NPCS.push(mkNpc(p,pos[0],pos[1]))});
 }
 function roomPeople(b){const h=hourNow();return S.people.filter(p=>p.id!==S.comp&&(locOf(p,h)===b.id||(S.where&&S.where.owner===p.id)||(S.where&&S.where.variant==='home'&&p.homeB===b.id&&locOf(p,h)===b.id)))}
 function spawnRoom(){
@@ -59,20 +52,24 @@ function refreshRoomNPCs(){const b=bld(S.where.b),h=hourNow();
 function onHour(){if(!S||!S.c)return;if(S.where)refreshRoomNPCs();else refreshCityNPCs();if(typeof storyHour==='function')storyHour();if(typeof renderHUD==='function')renderHUD()}
 function adjFree(m,x,y){for(const [dx,dy] of [[0,-1],[-1,0],[1,0],[0,1],[-1,-1],[1,-1]]){if(m.walk(x+dx,y+dy))return [x+dx,y+dy]}return null}
 function wander(n,m,r,maxN){const tx=cl(Math.floor(n.x)+R(-r,r),0,m.W-1),ty=cl(Math.floor(n.y)+R(-r,r),0,m.H-1);
-  n.path=(m.walk(tx,ty)&&(S.where||grid[gi(tx,ty)]!==T.ROAD)&&bfs(m,Math.floor(n.x),Math.floor(n.y),tx,ty,maxN))||[]}
+  n.path=(m.walk(tx,ty)&&bfs(m,Math.floor(n.x),Math.floor(n.y),tx,ty,maxN))||[]}
 function updNPCs(dt){
   const m=curMap();
   for(const n of NPCS){
+    thinkTick(n,dt);
     if(n.talking){n.dir=dirFrom(P.x-n.x,P.y-n.y);continue}
     if(n===COMP_NPC){if(n.path.length)stepMover(n,dt,n.spd*(S.where?1:1.25));continue}
     if(n.hold)continue;
     const p=pById(n.pid);
-    if(!n.path.length){n.wait-=dt;if(n.wait<=0){if(p&&p.spot&&!S.where){n.wait=4+rnd()*6;if(Math.abs(n.x-p.spot[0]-.5)+Math.abs(n.y-p.spot[1]-.5)>2)n.path=bfs(m,Math.floor(n.x),Math.floor(n.y),p.spot[0],p.spot[1],300)||[];else wander(n,m,1,40)}else{wander(n,m,S.where?3:7,S.where?200:900);n.wait=1.5+rnd()*(S.where?6:4)}}}
+    if(!n.path.length){n.wait-=dt;if(n.wait<=0){if(p&&p.key==='sam'&&!S.where){n.wait=4+rnd()*6;const sp=SCENES.cp.samSpot;if(Math.abs(n.x-sp[0]-.5)+Math.abs(n.y-sp[1]-.5)>2)n.path=bfs(m,Math.floor(n.x),Math.floor(n.y),sp[0],sp[1],300)||[];else wander(n,m,1,40)}else{wander(n,m,S.where?3:4,300);n.wait=1.5+rnd()*(S.where?6:5)}}}
     else stepMover(n,dt,n.spd);
   }
-  if(!S.where)for(const n of EXTRAS){if(!n.path.length){n.wait-=dt;if(n.wait<=0){wander(n,m,8,700);n.wait=.5+rnd()*3}}else stepMover(n,dt,n.spd);
-    if(Math.abs(n.x-P.x)+Math.abs(n.y-P.y)>30){const t=zoneTile(distAt(Math.floor(P.x),Math.floor(P.y)),true);n.x=t[0]+.5;n.y=t[1]+.5;n.path=[]}}
+  if(!S.where)for(const n of EXTRAS){if(!n.path.length){n.wait-=dt;if(n.wait<=0){wander(n,m,6,300);n.wait=.8+rnd()*3}}else stepMover(n,dt,n.spd);
 }
+}
+function thinkTick(n,dt){if(n===COMP_NPC)return;n.thT=(n.thT||0)-dt;if(n.thT<=-4-((n.pid||0)%5)){const p=pById(n.pid);if(!p)return;let ic,top=null;const r=rnd();
+  if(p.qOffer&&r<.3)ic='❗';else if(!p.noRom&&!p.fam&&p.rom>=45&&r<.45)ic=pick(['💋','❤','🌹']);else if(r<.7){top=pick(p.likes);ic=TOPIC_ICON[top]}else ic=pick(['🍔','💤','🚿','🎁','☕','🎶']);
+  n.thought=ic;n.thTop=top;n.thT=3;if(top&&Math.hypot(n.x-P.x,n.y-P.y)<4&&p.met&&!p.known[top]){p.known[top]=1;tick(`💭 ${p.first} domā par: ${top}`,'')}}}
 function stepMover(m,dt,spd){
   if(!m.path.length)return false;
   const [tx,ty]=m.path[0],gx=tx+.5,gy=ty+.5,dx=gx-m.x,dy=gy-m.y,dist=Math.hypot(dx,dy),st=spd*dt;
@@ -107,34 +104,33 @@ function arrive(){
   if(t.type==='obj'){P.dir=dirFrom(t.o.x+.5-P.x,t.o.y+.5-P.y);openObj(t.o);return}
   if(t.type==='furn'){P.dir=dirFrom(t.o.x+t.o.w/2-P.x,t.o.y+t.o.d/2-P.y);openObj(t.o);return}
   if(t.type==='exit'){leaveBuilding();return}
+  if(t.type==='exit2'){travelScene(t.to,'walk');return}
 }
 function playerStep(dt){
   if(!P.path.length)return;
-  const sp=S.where?2.6:3.3;
-  const prev=[Math.floor(P.x),Math.floor(P.y)];
+  const sp=S.where?2.4:2.6,prev=[Math.floor(P.x),Math.floor(P.y)];
   if(stepMover(P,dt,sp)){
-    if(!S.where){const d=distAt(Math.floor(P.x),Math.floor(P.y));if(d!==S.lastDist){S.lastDist=d;tick(`📍 ${DISTS[d].n}`,'y');renderHUD();if(typeof storyHour==='function')storyHour()}}
     if(COMP_NPC){const [lx,ly]=prev,m=curMap();if(m.walk(lx,ly))COMP_NPC.path=[[lx,ly]]}
     const t=P.target;
     if(t&&t.type==='npc'&&Math.hypot(t.n.x-P.x,t.n.y-P.y)<1.6){P.path=[];arrive()}
     else if(!P.path.length)arrive();
   }
 }
-
 /* ---------- Ievade ---------- */
-function screenToWorld(cx,cy){return {x:(cx*DPR-(CW/2-cam.x*K))/K,y:(cy*DPR-(CH/2-cam.y*K))/K}}
+function screenToWorld(cx,cy){const [ox,oy]=camOff();return {x:(cx/PX-ox)/K,y:(cy/PX-oy)/K}}
 function onTap(cx,cy){
   if(!S||!S.c||S.over||$('#modalRoot').innerHTML||MG_ON||S.tab!=='city')return;
   const w=screenToWorld(cx,cy),pt=[w.x,w.y];
   for(let i=HITS.length-1;i>=0;i--){const h=HITS[i];const hit=h.rect?(pt[0]>=h.rect[0]&&pt[0]<=h.rect[0]+h.rect[2]&&pt[1]>=h.rect[1]&&pt[1]<=h.rect[1]+h.rect[3]):inPoly(pt,h.poly);if(!hit)continue;
     if(h.k==='npc'){const n=h.ref;goTo(Math.floor(n.x),Math.floor(n.y),{type:'npc',n});return}
-    if(h.k==='bld'){goTo(h.ref.door[0],h.ref.door[1],{type:'door',id:h.ref.id});return}
+    if(h.k==='door'){const d=h.ref;if(!d.b)continue;goTo(d.tile[0],d.tile[1],{type:'door',id:d.b.id});return}
+    if(h.k==='exit2'){const e=h.ref;goTo(e.x,e.y,{type:'exit2',to:e.to});return}
     if(h.k==='obj'){goToFoot(h.ref.x,h.ref.y,1,1,{type:'obj',o:h.ref});return}
     if(h.k==='furn'){goToFoot(h.ref.x,h.ref.y,h.ref.w,h.ref.d,{type:'furn',o:h.ref});return}
     if(h.k==='exit'){goTo(ROOM.exit[0],ROOM.exit[1],{type:'exit'});return}
   }
   const tx=Math.floor((w.x/HW+w.y/HH)/2),ty=Math.floor((w.y/HH-w.x/HW)/2),m=curMap();
-  if(m.walk(tx,ty)){const door=!S.where&&BLDS.find(b=>b.door[0]===tx&&b.door[1]===ty);goTo(tx,ty,door?{type:'door',id:door.id}:(S.where&&tx===ROOM.exit[0]&&ty===ROOM.exit[1]?{type:'exit'}:null));TARGET.x=tx;TARGET.y=ty;TARGET.t=1}
+  if(m.walk(tx,ty)){const door=!S.where&&SCN().doors.find(d=>d.b&&d.tile[0]===tx&&d.tile[1]===ty),ex=!S.where&&SCN().exits.find(e=>e.x===tx&&e.y===ty);goTo(tx,ty,door?{type:'door',id:door.b.id}:ex?{type:'exit2',to:ex.to}:(S.where&&tx===ROOM.exit[0]&&ty===ROOM.exit[1]?{type:'exit'}:null));TARGET.x=tx;TARGET.y=ty;TARGET.t=1}
   else toast('Tur nevar aiziet.');
 }
 let pinch=null;
@@ -143,7 +139,7 @@ cv.addEventListener('wheel',e=>{e.preventDefault();setZoom(ZOOM*(e.deltaY>0?.9:1
 cv.addEventListener('touchstart',e=>{if(e.touches.length===2){const [a,b]=e.touches;pinch={d:Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY),z:ZOOM}}},{passive:true});
 cv.addEventListener('touchmove',e=>{if(pinch&&e.touches.length===2){const [a,b]=e.touches;setZoom(pinch.z*Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY)/pinch.d)}},{passive:true});
 cv.addEventListener('touchend',()=>{pinch=null},{passive:true});
-function setZoom(z){ZOOM=cl(z,.45,2.2);K=DPR*ZOOM;tileCache={}}
+function setZoom(z){ZOOM=cl(z,.7,1.8);K=BASEK*ZOOM;tileCache={};SPR.clear();for(const k in sprCache)delete sprCache[k]}
 const KEYS={ArrowUp:[0,-1],ArrowDown:[0,1],ArrowLeft:[-1,0],ArrowRight:[1,0],w:[0,-1],s:[0,1],a:[-1,0],d:[1,0]};let keyDir=null;
 document.addEventListener('keydown',e=>{if(!S||S.tab!=='city'||MG_ON||$('#modalRoot').innerHTML||e.target.tagName==='INPUT')return;if(KEYS[e.key]){keyDir=KEYS[e.key];e.preventDefault()}});
 document.addEventListener('keyup',e=>{if(KEYS[e.key])keyDir=null});
@@ -177,14 +173,14 @@ function doEnter(b,variant,owner){
   refreshUI();save();
 }
 function leaveBuilding(){
-  const b=bld(S.where.b);S.where=null;ROOM=null;
-  P.x=b.door[0]+.5;P.y=b.door[1]+.5;P.path=[];P.target=null;P.dir=b.side==='y'?0:1;
+  const b=bld(S.where.b);S.where=null;ROOM=null;S.scene=SCENE_OF[b.id]||S.scene||'gv1';const d=SCN().doors.find(x=>x.b&&x.b.id===b.id);
+  if(d){P.x=d.tile[0]+.5;P.y=d.tile[1]+.5;P.dir=d.ax==='y'?0:1}P.path=[];P.target=null;
   spawnCity();cam.init=false;refreshUI();save();
 }
 function afterNewDay(where){
   dismissComp(true);
-  if(where==='home'||!where){const b=bld(HOMES[C().home].b);doEnter(b,'home');const bd=ROOM.furn[0];P.x=bd.x+bd.w+.5;P.y=bd.y+1.5;if(!ROOM.walk(Math.floor(P.x),Math.floor(P.y))){P.x=ROOM.exit[0]+.5;P.y=ROOM.exit[1]+.5}}
-  else if(where==='hotel'){doEnter(bld('plaza'))}
+  if(where==='home'||!where){const b=bld(HOMES[C().home].b);S.scene=SCENE_OF[b.id];doEnter(b,'home');const bd=ROOM.furn[0];P.x=bd.x+bd.w+.5;P.y=bd.y+1.5;if(!ROOM.walk(Math.floor(P.x),Math.floor(P.y))){P.x=ROOM.exit[0]+.5;P.y=ROOM.exit[1]+.5}}
+  else if(where==='hotel'){S.scene='fa2';doEnter(bld('plaza'))}
   else{S.where=null;ROOM=null;P.x=Math.floor(P.x)+.5;P.y=Math.floor(P.y)+.5;spawnCity()}
   const left=LEASE_DAYS-S.day;tick(S.extended?`☀ ${S.day}. diena Ņujorkā`:`☀ ${S.day}. diena · līdz īres līguma beigām ${left} ${left===1?'diena':'dienas'}`,'y');
   tick(`${WX[S.weather].i} Laikapstākļi: ${WX[S.weather].n.toLowerCase()}${S.weather==='rain'||S.weather==='snow'?(C().inv.lietussargs?' — lietussargs ir līdzi':' — noderētu lietussargs (bodegā $8)'):''}`,'');
@@ -195,13 +191,13 @@ function endDayPrompt(){
   if(!S||!S.c||S.over||$('#modalRoot').innerHTML)return;const c=C();
   const home=S.where&&S.where.variant==='home';
   if(home){modal({t:'Iet gulēt?',b:`<p>Diena beidzas. Rīt ir ${S.day+1}. diena no ${LEASE_DAYS}.</p>`,ch:[{l:'Gulēt līdz rītam',fn:()=>endDay('home')},{l:'Vēl ne',exit:true}]});return}
-  const hb=bld(HOMES[c.home].b),dist=Math.abs(hb.door[0]-curPos()[0])+Math.abs(hb.door[1]-curPos()[1]),fare=Math.round(5+dist*.35);
+  const hb=bld(HOMES[c.home].b),fare=taxiFare(SCENE_OF[hb.id]);
   modal({t:'Beigt dienu?',b:'<p>Tu neesi mājās. Gulēšana uz soliņa kaitē veselībai un higiēnai.</p>',ch:[
-    {l:'Taksometrs uz mājām',s:`${usd(fare)} · 15 min`,fn:()=>{if(c.money<fare)return toast('Nepietiek naudas.');c.money-=fare;advance(15);if(S.where){S.where=null;ROOM=null}doEnter(hb,'home');endDayPrompt()}},
+    {l:'Taksometrs uz mājām',s:`${usd(fare)} · 15 min`,fn:()=>{if(c.money<fare)return toast('Nepietiek naudas.');c.money-=fare;advance(15);if(S.where){S.where=null;ROOM=null}S.scene=SCENE_OF[hb.id];doEnter(hb,'home');endDayPrompt()}},
     {l:'Gulēt uz soliņa',fn:()=>endDay('bench')},{l:'Turpināt dienu',exit:true}]});
 }
-function curPos(){return S.where?bld(S.where.b).door:[P.x,P.y]}
-
+function curPos(){const sc=SCENES[S.where?(SCENE_OF[S.where.b]||S.scene):S.scene];return [sc.mx,sc.my]}
+function taxiFare(id){const a=curPos(),b=SCENES[id];return Math.round(6+Math.hypot(a[0]-b.mx,a[1]-b.my)*.22)}
 /* ---------- Pavadonis ---------- */
 function setComp(p){S.comp=p.id;const n=NPCS.find(x=>x.pid===p.id);if(n){COMP_NPC=n;n.hold=false;n.talking=false;n.spd=S.where?1.6:3.3}log(`${p.first} pavada tevi.`,'g')}
 function dismissComp(silent){if(!S.comp)return;const p=pById(S.comp);S.comp=null;if(COMP_NPC){COMP_NPC.path=[];COMP_NPC=null}if(p&&!silent)toast(`${p.first} dodas savās gaitās.`)}
@@ -356,10 +352,14 @@ const ACT={
   news:o=>[I('Avīze','Somā · $1',1,1,()=>{addInv('avize');return 'Avīze somā.'}),I('Žurnāls „Laiks”','Dāvana · $6',1,6,()=>{addInv('zurnals');return 'Žurnāls somā.'})],
   bull:o=>[I('Paberzēt vērša degunu veiksmei','Volstrītas tradīcija',5,0,()=>{if(S.bullDay===S.day)return 'Vērsis šodien jau devis veiksmi.';S.bullDay=S.day;if(rnd()<.35){C().money+=25;return 'Veiksme! Tu atrodi $25.'}addFame(.5);return 'Tūristi tevi fotografē.'})],
   steps:o=>[act('Vērot Taimskvēru',30,0,{culture:2,humor:2},'',null,'Miljoniem gaismu un cilvēku.')],
-  subway:o=>STATIONS.filter(s=>s!==o).map(s=>I(`Uz: ${s.n}`,DISTS[s.d].n,12,3,()=>{travelTo(s.x,s.y,'metro',s.n);return `Metro aizved tevi: ${DISTS[s.d].n}.`})),
-  taxi:o=>Object.keys(DISTS).map(d=>{const s=STATIONS.find(x=>x.d===d),dist=Math.abs(s.x-o.x)+Math.abs(s.y-o.y),fare=Math.round(5+dist*.35);return I(`Uz: ${DISTS[d].n}`,'Dzeltenais taksometrs',Math.round(6+dist*.2),fare,()=>{travelTo(s.x,s.y,'taxi',DISTS[d].n);return `Taksometrs aizved tevi: ${DISTS[d].n}.`})}).concat([I('Uz mājām','Taksometrs',12,Math.round(5+Math.abs(bld(HOMES[C().home].b).door[0]-o.x)*.35+Math.abs(bld(HOMES[C().home].b).door[1]-o.y)*.35),()=>{const b=bld(HOMES[C().home].b);travelTo(b.door[0],b.door[1],'taxi','Mājas');return 'Esi pie mājām.'})])
+  subway:o=>[M_('Braukt ar metro','Izvēlies staciju kartē · $3',()=>openMap('metro'))],
+  taxi:o=>[M_('Izsaukt taksometru','Izvēlies galamērķi kartē',()=>openMap('taxi'))]
 };
-function travelTo(x,y,kind,label){if(kind&&typeof showTransit==='function')showTransit(kind,label);if(S.where){S.where=null;ROOM=null}const t=walkCity(x,y)?[x,y]:(adjFree(CITY,x,y)||[x,y]);P.x=t[0]+.5;P.y=t[1]+.5;P.path=[];P.target=null;cam.init=false;spawnCity()}
+function travelScene(id,kind,label){const from=S.where?(SCENE_OF[S.where.b]||S.scene):S.scene;if(kind&&kind!=='walk'&&typeof showTransit==='function')showTransit(kind,label||SCENES[id].n);
+  if(kind==='walk')advance(12);
+  if(S.where){S.where=null;ROOM=null}S.scene=id;const m=SCN();let t;
+  if(kind==='walk'){const e=m.exits.find(e=>e.to===from);t=e?[e.x-1,e.y]:[6,4]}else if(kind==='metro'){const st=m.objs.find(o=>o.k==='subway');t=st?(adjFree(m,st.x,st.y)||[5,4]):[5,4]}else{const tx=m.objs.find(o=>o.k==='taxi');t=tx?[Math.max(1,tx.x-1),Math.min(SH-1,tx.y)]:[6,5]}
+  if(!m.walk(t[0],t[1]))t=adjFree(m,t[0],t[1])||[5,4];P.x=t[0]+.5;P.y=t[1]+.5;P.path=[];P.target=null;cam.init=false;spawnCity();if(kind==='walk')tick(`📍 ${SCENES[id].n}`,'y');if(typeof storyHour==='function')storyHour();refreshUI()}
 function momLock(){return S.momDay!=null&&S.day-S.momDay<10?`Nākamreiz pēc ${10-(S.day-S.momDay)} d.`:null}
 function momMoney(){S.momDay=S.day;C().mom=(C().mom||0)+1;C().money+=150;return C().mom>2?'Mamma sūta $150, bet nopūšas: „Kad tu sāksi pelnīt pats?”':'Mamma atsūta $150: „Ēd kārtīgi, dēliņ/meitiņ!”'}
 function freeDance(b,partner){if(!spendT(30,0))return;startMinigame('dance',0,r=>{addSt('humor',1+Math.round(r*2));need('energy',-8);need('hygiene',-6);addFame(r*1.5);let msg=`Deja: ${Math.round(r*100)}%.`;
@@ -435,10 +435,12 @@ function socialMenu(n){
   const ints=known?TOPICS.filter(t=>p.known[t]).map(t=>`<span class="tag ${p.likes.includes(t)?'lk':p.dislikes.includes(t)?'dk':''}">${TOPIC_ICON[t]} ${t}</span>`).join(''):'';
   const body=known?`<div class="relrow"><span>${rankOf(p.f)}</span>${bar(p.f/FMAX*100)}<b>${Math.round(p.f)}</b></div>${!p.fam&&!p.noRom?`<div class="relrow"><span>Romantika</span>${bar(p.rom/FMAX*100,'love')}<b>${Math.round(p.rom)}</b></div>`:''}${ints?`<div class="tags">${ints}</div>`:'<p class="muted small" style="margin:0">Intereses vēl nezini — runā par dažādām tēmām vai pajautā.</p>'}${p.bio&&p.cast?`<p class="muted small" style="margin:4px 0 0">${esc(p.bio)}</p>`:''}${C().needs.hygiene<30?'<p class="small" style="color:var(--bad);margin:4px 0 0">No tevis ož… Sarunas iet sliktāk. Ej dušā!</p>':''}`:`<p class="muted" style="margin:0">Tu vēl nepazīsti šo cilvēku.${gw?' '+esc(gw):''}</p>`;
   const pic=`<img class="portrait ${p._ex||''}" src="${portraitURL(p.look,p.sex,p._ex||null)}" alt="">`;p._ex=null;
-  modal({t:known?fullName(p):(p.cast?p.role:'Svešinieks'),sub:`${known?(p.role?p.role+' · ':'')+relLabel(p):DISTS[p.zone]?.n||''} · ${clockStr()}`,b:`<div class="phead">${pic}<div class="pinfo">${body}</div></div>`,ch});
+  modal({t:known?fullName(p):(p.cast?p.role:'Svešinieks'),sub:`${known?(p.role?p.role+' · ':'')+relLabel(p):DISTS[p.zone]?.n||''} · ${clockStr()}`,wheel:{pic,info:body,cap:n.bub||null},ch});
 }
+function wpic(p){return `<img class="portrait ${p._ex||''}" src="${portraitURL(p.look,p.sex,p._ex||null)}" alt="">`}
+function wints(p){const t=TOPICS.filter(t=>p.known[t]).map(t=>`<span class="tag ${p.likes.includes(t)?'lk':p.dislikes.includes(t)?'dk':''}">${TOPIC_ICON[t]} ${t}</span>`).join('');return t?`<div class="tags">${t}</div>`:'<p class="muted small" style="margin:0">Intereses vēl nezini — vēro domu burbuļus!</p>'}
 function topicMenu(n,p){
-  modal({t:`Runāt ar ${nAcc(p.first)} par…`,sub:'Pieskaņo tēmu sarunu biedra interesēm',ch:TOPICS.map(t=>({l:`${TOPIC_ICON[t]} ${t}`,s:p.known[t]?(p.likes.includes(t)?'Patīk!':p.dislikes.includes(t)?'Nepatīk':'Neitrāli'):'',fn:()=>{
+  modal({t:`Runāt ar ${nAcc(p.first)} par…`,sub:'Pieskaņo tēmu sarunu biedra interesēm',wheel:{pic:wpic(p),info:wints(p)},ch:TOPICS.map(t=>({l:`${TOPIC_ICON[t]} ${t}`,s:p.known[t]?(p.likes.includes(t)?'Patīk!':p.dislikes.includes(t)?'Nepatīk':'Neitrāli'):'',fn:()=>{
     if(!spendT(30,0)){n.talking=false;return}const mul=socialMul(),rep=p.tDay[t]||0,fat=1/(1+rep);p.tDay[t]=rep+1;
     let msg,b,ex=null;if(p.likes.includes(t)){p.known[t]=1;bond(p,R(8,12)*fat,R(0,2)*fat);ex=rep?'happy':pick(['happy','laugh']);msg=rep?`${p.first} jau par to runāja… (${Math.round(fat*100)}%)`:`${p.first} dievina šo tēmu! 😊`;b=pick(TOPIC_LINE[t])}
     else if(p.dislikes.includes(t)){p.known[t]=1;p.f=cl(p.f-6,0,FMAX);msg=`${p.first} žāvājas… 🥱`;b='Garlaicīgi…';ex='bored'}
@@ -447,7 +449,7 @@ function topicMenu(n,p){
 }
 function jokeMenu(n,p){const c=C();
   const J=[['smalks','Asprātīgs joks','Humors + kultūra'],['rupjš','Rupjš joks','Humors'],['prank','Izspēlēt palaidnību','+1 noziedzīgums']];
-  modal({t:`Jokot ar ${nAcc(p.first)}`,ch:J.map(([k,l,s])=>({l,s:s+' · 10 min',fn:()=>{if(!spendT(10,0)){n.talking=false;return}const mul=socialMul();let msg,b;
+  modal({t:`Jokot ar ${nAcc(p.first)}`,sub:`Humora gaume: ${p.met&&p.known._hum?p.humor:'nezināma'}`,wheel:{pic:wpic(p),info:wints(p)},ch:J.map(([k,l,s])=>({l,s:s+' · 10 min',fn:()=>{if(!spendT(10,0)){n.talking=false;return}const mul=socialMul();let msg,b;
     const taste=k==='prank'?p.humor==='rupjš':(p.humor==='visi'||p.humor===k);const skill=k==='smalks'?.2+c.st.humor/130+c.st.culture/260:k==='rupjš'?.3+c.st.humor/110:.35;
     if(k==='prank')addSt('crime',1);let ex;
     if(taste&&rnd()<skill*mul+(p.jokes?.15:0)){bond(p,R(6,10)*(p.jokes?1.5:1),0);msg=`${p.first} smejas līdz asarām!`;b=pick(['Hahaha!','Tu esi traks!','Ha! Labs!']);ex='laugh'}
@@ -456,7 +458,7 @@ function jokeMenu(n,p){const c=C();
     p.lastSeen=S.day;toast(msg);bubble(n,b,ex);P.ex=ex==='laugh'?'laugh':'sad';P.exT=2.5;checkTrophies();renderHUD();save();socialMenu(n)}})).concat([{l:'Atpakaļ',exit:true,fn:()=>socialMenu(n)}])});
 }
 function giftMenu(n,p){const c=C();const gifts=Object.keys(c.inv).filter(k=>c.inv[k]>0&&(ITEMS[k].gift||(p.key==='sam'&&k==='hotdog')));
-  modal({t:`Dāvana: ${p.first}`,ch:gifts.map(k=>({l:ITEMS[k].n,s:`Tev ir ${c.inv[k]}${ITEMS[k].tag&&p.known[ITEMS[k].tag]!=null?(p.likes.includes(ITEMS[k].tag)?' · patiks!':p.dislikes.includes(ITEMS[k].tag)?' · nepatiks':''):''}`,fn:()=>{c.inv[k]--;
+  modal({t:`Dāvana: ${p.first}`,wheel:{pic:wpic(p),info:wints(p)},ch:gifts.map(k=>({l:ITEMS[k].n,s:`Tev ir ${c.inv[k]}${ITEMS[k].tag&&p.known[ITEMS[k].tag]!=null?(p.likes.includes(ITEMS[k].tag)?' · patiks!':p.dislikes.includes(ITEMS[k].tag)?' · nepatiks':''):''}`,fn:()=>{c.inv[k]--;
     if(p.key==='sam'&&k==='hotdog'){S.flags.samFed=S.day;bond(p,8,0);bubble(n,'Mmm! Tagad varu tev ko iemācīt.','happy');toast('Sems apēd hotdogu un ir gatavs mācīt.');advance(5);save();socialMenu(n);return}
     const it=ITEMS[k];let v=it.gift;if(it.tag&&p.likes.includes(it.tag)){v*=2;p.known[it.tag]=1}else if(it.tag&&p.dislikes.includes(it.tag)){v*=.3;p.known[it.tag]=1}
     bond(p,v,!p.noRom&&p.f>=35?v*.6:0);bubble(n,v>=12?'Wow, paldies!!':v<4?'Ē… paldies.':'Paldies!',v>=12?(p.noRom||p.fam?'laugh':'love'):v<4?'bored':'happy');toast(`${p.first} ${v>=12?'ir sajūsmā':'saņem dāvanu'}.`);advance(5);save();socialMenu(n)}})).concat([{l:'Atpakaļ',exit:true,fn:()=>socialMenu(n)}])})}
@@ -487,21 +489,23 @@ function needAlerts(){const c=C(),n=c.needs;
   const warn=(k,txt)=>{if(n[k]<15&&S.warn!==k+S.day+Math.floor(S.min/120)){S.warn=k+S.day+Math.floor(S.min/120);tick(txt,'b')}};
   warn('food','🍎 Tu esi izsalcis — paēd!');warn('energy','zZ Tu esi noguris — izguļies vai iedzer kafiju.');warn('hygiene','🚿 No tevis ož — ej dušā!');warn('bladder','WC Steidzami vajag uz tualeti!');
 }
+function thinkTickX(n,dt){}
 function frame(now){
   const dt=Math.min(.05,(now-lastT)/1000);lastT=now;TIME=now/1000;
+  if(!(S&&S.c&&!S.over&&S.tab==='city'))clearFX();
   if(S&&S.c&&!S.over&&S.tab==='city'&&!document.hidden){
     const h=hourNow();DUSK=h>=18?cl((h-18)/2.5,0,1):0;NIGHT=h>=20?cl((h-20)/1.5,0,1):0;if(S.where)NIGHT=Math.min(NIGHT,.9);
-    const modalOpen=!!$('#modalRoot').innerHTML||MG_ON;
+    const modalOpen=!!$('#modalRoot').innerHTML||MG_ON||!$('#mapov').hidden;
     if(!modalOpen){
       if(!P.path.length&&keyDir){const m=curMap(),nx=Math.floor(P.x)+keyDir[0],ny=Math.floor(P.y)+keyDir[1];if(m.walk(nx,ny)){P.path=[[nx,ny]];P.target=null;
-        if(!S.where){const door=BLDS.find(b=>b.door[0]===nx&&b.door[1]===ny);if(door)P.target={type:'door',id:door.id}}else if(nx===ROOM.exit[0]&&ny===ROOM.exit[1])P.target={type:'exit'}}}
+        if(!S.where){const m2=SCN(),door=m2.doors.find(d=>d.b&&d.tile[0]===nx&&d.tile[1]===ny),ex=m2.exits.find(e=>e.x===nx&&e.y===ny);if(door)P.target={type:'door',id:door.b.id};else if(ex)P.target={type:'exit2',to:ex.to}}else if(nx===ROOM.exit[0]&&ny===ROOM.exit[1])P.target={type:'exit'}}}
       playerStep(dt);
       if(S.min<DAY_MIN)advance(dt*(S.speed||2));
       NEEDT+=dt;if(NEEDT>1){NEEDT=0;needAlerts();renderNeeds()}
     }
-    if(!S.where){updCars(dt);updPigeons(dt)}updNPCs(dt);
-    const ps=iso(P.x,P.y);let tx=ps.x,ty=ps.y-30;if(S.where){const rc=iso(ROOM.W/2,ROOM.H/2);tx=rc.x*.75+ps.x*.25;ty=(rc.y-40)*.75+(ps.y-30)*.25}if(!cam.init){cam.x=tx;cam.y=ty;cam.init=true}cam.x+=(tx-cam.x)*Math.min(1,dt*6);cam.y+=(ty-cam.y)*Math.min(1,dt*6);
-    if(S.where)renderRoom(ROOM,dt);else renderCity(dt);
+    if(!S.where){updCars(dt);updPigeons(dt)}updNPCs(dt);for(const n of EXTRAS)thinkTickX(n,dt);
+    const ps=iso(P.x,P.y);let tx=ps.x,ty=ps.y-40;if(S.where){const rc=iso(ROOM.W/2,ROOM.H/2);tx=rc.x*.6+ps.x*.4;ty=(rc.y-50)*.6+(ps.y-40)*.4}else{const a=iso(0,SH),b=iso(SW,0),hw=CW/2/K,hh=CH/2/K;tx=cl(tx,Math.min(a.x+hw-20,b.x),Math.max(b.x-hw+60,a.x));ty=cl(ty,-200+hh-120,iso(SW,SH).y-hh+120)}if(!cam.init){cam.x=tx;cam.y=ty;cam.init=true}cam.x+=(tx-cam.x)*Math.min(1,dt*5);cam.y+=(ty-cam.y)*Math.min(1,dt*5);
+    if(S.where)renderRoom(ROOM,dt);else renderScene(SCN(),dt);
     HUDT+=dt;if(HUDT>.5){HUDT=0;const ck=document.querySelector('.pill.clock');if(ck)ck.textContent=clockStr()}
     if(!modalOpen&&S.min>=DAY_MIN){S.min=DAY_MIN;P.path=[];modal({t:'Ir 04:00',b:'<p>Tu esi pārāk noguris, lai turpinātu. Acis veras ciet…</p>',ch:[{l:'Gulēt',fn:()=>endDay(S.where&&S.where.variant==='home'?'home':S.where&&S.where.b==='plaza'?'hotel':'bench')}]})}
     else if(!modalOpen&&C().needs.energy<=0){C().needs.energy=5;P.path=[];addSt('health',-4);modal({t:'Tu sabrūc no noguruma',b:'<p>Tev steidzami jāizguļas.</p>',ch:[{l:'Gulēt',fn:()=>endDay(S.where&&S.where.variant==='home'?'home':'bench')}]})}
