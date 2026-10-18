@@ -19,11 +19,14 @@ function addFame(v){S.fame=cl((S.fame||0)+v)}
 function relLabel(p){if(p.fam)return 'brālis';if(p.steady)return p.sex==='m'?'tavs puisis':'tava meitene';return rankOf(p.f).toLowerCase()}
 
 /* ---------- Izskats ---------- */
-function randLook(sex){
-  const top=sex==='f'?pick(['tee','tank','shirt','hoodie','dress','jacket','tee']):pick(['tee','shirt','hoodie','jacket','tee','shirt']);
+function randLook(sex,wx){
+  const tops=sex==='f'?['tee','tank','shirt','hoodie','dress','jacket','sweater','coat','leather','tee']:['tee','shirt','hoodie','jacket','sweater','coat','leather','suit','tee','shirt'];
+  let top=pick(tops);if(wx==='snow'&&rnd()<.6)top='coat';
   const bot=top==='dress'?'none':(sex==='f'?pick(['jeans','skirt','pants','jeans']):pick(['jeans','pants','jeans']));
-  return {skin:pick(SKIN),hair:sex==='f'?pick(['long','bun','pony','curly','short','long']):pick(['short','short','curly','mohawk','bald','short']),hairC:pick(HAIRC)[0],
-    top:{t:top,c:pick(COLORS)},bot:{t:bot,c:pick(['#2c3150','#3a3a44','#5a4630','#1f3d6b','#6b6b70','#c49a6c'])},shoe:pick(['#1e1d24','#f4f4f4','#7a4b2a','#2b3a67']),acc:rnd()<.25?pick(['sunglasses','cap','hat','beanie']):null};
+  const hairs=sex==='f'?['long','bun','pony','curly','short','long','bob','braids','afro','slick']:['short','short','curly','mohawk','bald','short','afro','spiky','buzz','slick'];
+  let acc=rnd()<.42?pick(['sunglasses','cap','hat','beanie','scarf','headphones','bag','bag']):null;if(wx==='snow'&&rnd()<.6)acc=pick(['beanie','scarf']);
+  return {skin:pick(SKIN),hair:pick(hairs),hairC:pick(HAIRC.slice(0,rnd()<.9?6:8))[0],top:{t:top,c:pick(COLORS)},bot:{t:bot,c:pick(['#2c3150','#3a3a44','#5a4630','#1f3d6b','#6b6b70','#c49a6c'])},shoe:pick(['#1e1d24','#f4f4f4','#7a4b2a','#2b3a67']),acc,
+    beard:sex==='m'&&rnd()<.22,capC:pick(['#2b3a67','#c0392b','#2e8b57','#ffc857','#222']),scarfC:pick(['#c0392b','#ffc857','#2fb7b0','#9b5bd6','#f4f4f4']),bagC:pick(['#8a5a36','#2b2f3a','#c0643a']),tie:pick(['#b22234','#2b3a67','#2e8b57']),umb:pick(['#2b3a67','#c0392b','#2e8b57','#ffc857','#9b5bd6','#222','#ff6fae'])};
 }
 const LK=(skin,hair,hairC,tt,tc,bt,bc,shoe,acc)=>({skin,hair,hairC,top:{t:tt,c:tc},bot:{t:bt,c:bc},shoe,acc:acc||null});
 function randInterests(){const a=TOPICS.slice().sort(()=>rnd()-.5);return {likes:[a[0],a[1]],dislikes:[a[2]]}}
@@ -96,7 +99,7 @@ function locOf(p,h){if(p.appt&&p.appt.day===S.day&&h>=p.appt.from&&h<p.appt.unti
 function newGame(o){
   S={day:1,uid:100,tab:'city',min:0,log:[],people:[],msgs:[],quests:[],trophies:[],flags:{shifts:0,dates:0},fame:0,speed:2,where:null,pos:null,story:{}};
   S.c={first:o.first,sex:o.sex,skin:o.skin,hair:{s:o.hair,c:o.hairC},st:Object.assign({beauty:0,health:0,humor:0,culture:0,strength:5,crime:0},o.st),
-    needs:{food:80,energy:85,hygiene:90,bladder:80},money:600,home:0,furn:{},fridge:2,inv:{avize:1},wardrobe:[],eq:{top:0,bot:1,shoe:2,acc:-1},job:null,mom:0};
+    needs:{food:80,energy:85,hygiene:90,bladder:80},money:600,beard:!!o.beard,home:0,furn:{},fridge:2,inv:{avize:1},wardrobe:[],eq:{top:0,bot:1,shoe:2,acc:-1},job:null,mom:0};
   const c=S.c;
   c.wardrobe=[{cid:o.sex==='f'?'tank':'tee',color:o.shirt},{cid:o.sex==='f'?'skirt':'jeans',color:o.sex==='f'?'#2c3150':'#1f3d6b'},{cid:'snk',color:'#f4f4f4'}];
   castDefs(o.sex).forEach(d=>{const p=mkPerson({});Object.assign(p,{cast:1,key:d.key,first:d.first,last:d.last,sex:d.sex,look:d.look,likes:d.likes,dislikes:d.dislikes,humor:d.humor,gossip:d.gossip,jokes:d.jokes,gate:d.gate,gateMax:d.gateMax,gatePop:d.gatePop,
@@ -112,7 +115,7 @@ function cloth(cid){return CLOTH.find(x=>x.id===cid)}
 function myLook(){const c=C(),w=c.wardrobe,g=i=>i>=0&&w[i]?w[i]:null;
   const top=g(c.eq.top),bot=g(c.eq.bot),shoe=g(c.eq.shoe),acc=g(c.eq.acc);
   const tc=top?cloth(top.cid):null,bc=bot?cloth(bot.cid):null,ac=acc?cloth(acc.cid):null;
-  return {skin:c.skin,hair:c.hair.s,hairC:c.hair.c,top:{t:tc?tc.t:'tee',c:top?top.color:'#ffffff'},bot:{t:tc&&tc.t==='dress'?'none':(bc?bc.t:'jeans'),c:bot?bot.color:'#2c3150'},shoe:shoe?shoe.color:'#1e1d24',acc:ac?ac.t:null,dirty:c.needs.hygiene<25};
+  return {skin:c.skin,hair:c.hair.s,hairC:c.hair.c,top:{t:tc?tc.t:'tee',c:top?top.color:'#ffffff'},bot:{t:tc&&tc.t==='dress'?'none':(bc?bc.t:'jeans'),c:bot?bot.color:'#2c3150'},shoe:shoe?shoe.color:'#1e1d24',acc:ac?ac.t:null,dirty:c.needs.hygiene<25,beard:c.beard,capC:'#2b3a67',scarfC:'#ff4fa3',bagC:'#8a5a36',tie:'#b22234'};
 }
 function styleScore(){const c=C();let s=0;['top','bot','shoe','acc'].forEach(k=>{const it=c.wardrobe[c.eq[k]];if(it&&c.eq[k]>=0){const cd=cloth(it.cid);if(!(k==='bot'&&cloth(c.wardrobe[c.eq.top]?.cid||'tee').t==='dress'))s+=cd.st}});
   const hs=HAIRS.find(h=>h.id===c.hair.s);return Math.round(s+(hs?hs.st:0))}
@@ -131,6 +134,8 @@ function advance(min){
   if(c.needs.food<=0)addSt('health',-min*.01);
   if(c.needs.hygiene<=0){S.flags.stinky=1;addSt('beauty',-min*.004)}
   if(c.needs.energy<=8)addSt('health',-min*.004);
+  if(!S.where&&(S.weather==='rain'||S.weather==='snow')&&!c.inv.lietussargs){need('hygiene',-min*.03);if(!S.wetWarn||S.wetWarn<S.day){S.wetWarn=S.day;if(typeof tick==='function')tick(S.weather==='rain'?'☔ Tu esi izmircis! Lietussargs bodegā maksā $8.':'❄ Tu salsti… Lietussargs bodegā maksā $8.','b')}}
+  if(!S.where&&S.weather==='snow')need('energy',-min*.012);
   const h=Math.floor(hourNow());if(h!==S.lastHour){S.lastHour=h;if(typeof onHour==='function')onHour()}
 }
 function spendT(min,cost){const c=C();if(S.min+min>DAY_MIN){toast('Šodien vairs nepietiek laika. Ej gulēt.');return false}if(cost&&c.money<cost){toast('Nepietiek naudas.');return false}c.money-=cost||0;advance(min);return true}
@@ -157,7 +162,12 @@ function endDay(where){ // 'home'|'hotel'|'friend'|'bench'
   if(typeof afterNewDay==='function')afterNewDay(where);
   save();
 }
+const WX={clear:{n:'Saulains',i:'☀'},cloudy:{n:'Mākoņains',i:'☁'},rain:{n:'Lietus',i:'🌧'},snow:{n:'Sniegs',i:'❄'}};
+function rollWeather(){const d=S.day,r=rnd();if(d===1){S.weather='clear';return}
+  const w=d<=12?[['clear',.5],['cloudy',.28],['rain',.22]]:d<=26?[['clear',.36],['cloudy',.3],['rain',.34]]:[['clear',.28],['cloudy',.24],['rain',.14],['snow',.34]];
+  let a=0;for(const [k,p] of w){a+=p;if(r<a){S.weather=k;return}}S.weather='clear'}
 function newDayWorld(){
+  rollWeather();
   S.people.forEach(p=>{if(p.appt&&p.appt.day<S.day)p.appt=null;p.qOffer=null;p.tDay={};genSched(p)});
   const cand=S.people.filter(p=>p.town&&!S.quests.some(q=>q.giver===p.id));
   for(let i=0;i<4&&cand.length;i++){const p=cand.splice(R(0,cand.length-1),1)[0];p.qOffer=genQuest(p)}

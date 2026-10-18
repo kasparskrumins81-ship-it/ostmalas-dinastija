@@ -169,6 +169,29 @@ input[type=text]{width:100%;background:rgba(255,255,255,.06);border:1px solid va
 .stk{display:grid;gap:10px}.stkhead{display:flex;justify-content:space-between;font-family:var(--f-disp);font-weight:800;font-variant-numeric:tabular-nums}#stkPL{color:var(--gold)}#stkc{width:100%;height:230px;border-radius:16px;display:block}.stknews{min-height:40px;font-size:14px;padding:8px 12px;border-radius:12px;background:rgba(255,255,255,.06)}
 .stkb{display:grid;grid-template-columns:1fr 1fr;gap:10px}.stkb button{height:64px;border-radius:18px;border:0;font-family:var(--f-disp);font-weight:800;font-size:20px;cursor:pointer}.stkb .ok{background:#2fbf6f;color:#042}.stkb .bad{background:#e0435f;color:#fff}.stkb button:disabled{opacity:.35}
 .dfield{flex:1;min-height:300px;display:grid;grid-template-columns:repeat(4,1fr);gap:8px;position:relative;overflow:hidden;border-radius:20px;background:rgba(255,255,255,.04)}
+
+img.ava{object-fit:cover;background:#2a2450;padding:0}
+.phead{display:flex;gap:12px;align-items:flex-start}.pinfo{flex:1;min-width:0}
+.portrait{width:84px;height:84px;border-radius:50%;flex:none;border:2px solid rgba(255,255,255,.25);box-shadow:0 6px 18px rgba(0,0,0,.35);transition:transform .2s}
+.portrait.love{border-color:#ff7aa8;box-shadow:0 0 0 3px rgba(255,79,163,.35),0 6px 18px rgba(0,0,0,.35)}.portrait.angry{border-color:#ff5d5d}.portrait.happy,.portrait.laugh{border-color:#6fe0a0;animation:hop .4s}.portrait.bored{filter:saturate(.6)}
+@keyframes hop{40%{transform:translateY(-5px)}}
+.transit{position:fixed;inset:0;z-index:80;overflow:hidden;pointer-events:none;animation:tfade 1.5s forwards}
+@keyframes tfade{0%{opacity:0}12%,80%{opacity:1}100%{opacity:0}}
+.transit.metro{background:linear-gradient(180deg,#0d0c16,#24202f 45%,#3a3442 60%,#15131c)}
+.transit .tun{position:absolute;left:0;right:0;top:58%;height:8px;background:repeating-linear-gradient(90deg,#6b6070 0 40px,#3a3442 40px 80px);animation:rail .3s linear infinite}
+@keyframes rail{to{background-position:-80px 0}}
+.transit .train{position:absolute;top:34%;left:100%;height:22%;width:240%;border-radius:18px 40px 40px 18px;background:linear-gradient(180deg,#c9ced6,#9aa1ab 70%,#6b7079);display:flex;gap:4%;align-items:center;padding:0 4%;animation:train 1.35s cubic-bezier(.3,.1,.5,1) forwards;box-shadow:0 0 40px rgba(255,220,150,.25)}
+.transit .train i{flex:1;height:45%;border-radius:8px;background:linear-gradient(180deg,#ffe8a8,#f6c86a);box-shadow:0 0 18px rgba(255,210,120,.7)}
+@keyframes train{to{left:-260%}}
+.transit.taxi{background:linear-gradient(180deg,#ff9a6a,#ff5f8a 40%,#2b2350 72%)}
+.transit .sky{position:absolute;left:-10%;right:-10%;bottom:30%;height:38%;background:repeating-linear-gradient(90deg,#1d1838 0 9%,transparent 9% 11%,#251f45 11% 17%,transparent 17% 19%);-webkit-mask:linear-gradient(0deg,#000 60%,transparent);animation:skyx 1.5s linear}
+@keyframes skyx{to{transform:translateX(-10%)}}
+.transit .road{position:absolute;left:0;right:0;bottom:0;height:30%;background:#3a3d46;border-top:4px solid #8a8f99}
+.transit .cab{position:absolute;bottom:22%;left:-40%;width:34%;height:13%;min-width:150px;border-radius:30px 46px 10px 10px;background:#ffc61a;box-shadow:inset 0 -10px 0 #d9a400;display:grid;place-items:center;animation:cab 1.4s cubic-bezier(.3,.1,.5,1) forwards}
+.transit .cab span{position:absolute;top:-22px;padding:2px 8px;border-radius:5px;background:#fff6c8;color:#222;font:800 12px var(--f-disp)}
+@keyframes cab{to{left:110%}}
+.transit .tlab{position:absolute;left:0;right:0;top:16%;text-align:center;font-family:var(--f-disp);font-weight:800;font-size:24px;color:#fff;text-shadow:0 2px 10px rgba(0,0,0,.5)}
+.transit .tlab b{display:inline-grid;place-items:center;width:34px;height:34px;border-radius:50%;background:#2e8b57;margin-right:10px;font-size:18px}
 /* deja */
 #dance{position:fixed;inset:0;z-index:70;background:radial-gradient(circle at 50% 30%,#3a1f5c,#0b0818);display:flex;flex-direction:column;padding:calc(env(safe-area-inset-top,0px) + 20px) max(16px,env(safe-area-inset-right,0px)) calc(env(safe-area-inset-bottom,0px) + 20px) max(16px,env(safe-area-inset-left,0px))}
 #dance[hidden]{display:none!important}
@@ -207,6 +230,7 @@ input[type=text]{width:100%;background:rgba(255,255,255,.06);border:1px solid va
   <button role="tab" data-tab="story">Stāsts</button>
 </nav>
 <div id="mg" hidden></div>
+<div id="transit" class="transit" hidden></div>
 <div id="modalRoot"></div>
 <script src="data.js"></script>
 <script src="world.js"></script>

@@ -112,6 +112,8 @@ function buildCity(){
   [[18,21],[51,38],[8,38]].forEach(([x,y])=>{const p=near(x,y,T.WALK);addObj({k:'news',x:p[0],y:p[1],act:'news'},true)});
   addObj({k:'bull',x:46,y:55,act:'bull'},true);
   addObj({k:'steps',x:24,y:26,act:'steps'},true);addObj({k:'steps',x:25,y:26,act:'steps'},true);
+  // kanalizācijas lūkas ar tvaiku
+  for(let i=0,c=0;i<400&&c<18;i++){const r=pick(ROADS),t=R(1,57),hz=rr()<.5,x=hz?t:r+(rr()<.5?0:1),y=hz?r+(rr()<.5?0:1):t;if(grid[gi(x,y)]!==T.ROAD)continue;if(ROADS.some(q=>(hz?x:y)>=q-1&&(hz?x:y)<=q+2))continue;if(CITY_OBJS.some(o=>o.k==='manhole'&&Math.abs(o.x-x)+Math.abs(o.y-y)<6))continue;CITY_OBJS.push({k:'manhole',x,y,nb:1});c++}
   // hidranti (dekors)
   for(let i=4;i<58;i+=9)for(const r of ROADS){const x=i,y=r+2;if(grid[gi(x,y)]===T.WALK&&free(x,y)&&distAt(x,y)!=='cp')CITY_OBJS.push({k:'hydrant',x,y,nb:1})}
   // laternas

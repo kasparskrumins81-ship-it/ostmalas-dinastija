@@ -26,8 +26,8 @@ function renderHUD(){
   if(!S||!S.c)return;const c=C();
   const where=S.where?bld(S.where.b).n:DISTS[distAt(Math.floor(P.x),Math.floor(P.y))].n;
   $('#hud').innerHTML=`<div class="hud-card glass"><div class="r1">
-    <div class="ava" style="background:${myLook().top.c}">${esc(c.first[0])}</div>
-    <div class="who"><b>${esc(c.first)}</b><span>${S.extended?S.day+'. diena':`Diena ${Math.min(S.day,LEASE_DAYS)}/${LEASE_DAYS}`} · ${esc(where)}</span></div>
+    <img class="ava" src="${portraitURL(myLook(),c.sex,null)}" alt="">
+    <div class="who"><b>${esc(c.first)}</b><span>${S.extended?S.day+'. diena':`Diena ${Math.min(S.day,LEASE_DAYS)}/${LEASE_DAYS}`} · ${WX[S.weather||'clear'].i} · ${esc(where)}</span></div>
     <div class="pill clock">${clockStr()}</div><div class="pill money">${usd(c.money)}</div>
   </div><div class="needs" id="needsRow"></div></div>`;
   renderNeeds();
@@ -71,7 +71,7 @@ function renderPhone(){
   let body='';
   if(t==='contacts'){const list=S.people.filter(p=>p.met).sort((a,b)=>(b.steady?999:0)+b.f-(a.steady?999:0)-a.f);
     body=list.length?`<div class="rows">${list.map(p=>{const ints=TOPICS.filter(x=>p.known[x]).map(x=>`<span class="tag ${p.likes.includes(x)?'lk':p.dislikes.includes(x)?'dk':''}">${TOPIC_ICON[x]} ${x}</span>`).join('');
-      return `<div class="row"><div class="ava sm" style="background:${p.look.top.c}">${esc(p.first[0])}</div><div class="nm"><b>${esc(fullName(p))}${p.steady?' ❤':''}</b><span>${esc(p.role||'')} · ${relLabel(p)} · ${DISTS[p.zone]?.n||''}</span><div class="mini2">${bar(p.f/FMAX*100)}${!p.fam&&!p.noRom?bar(p.rom/FMAX*100,'love'):''}</div>${ints?`<div class="tags">${ints}</div>`:''}</div>${p.phone?`<button class="btn" data-call="${p.id}">Zvanīt</button><button class="btn" data-inv="${p.id}">Uzaicināt</button>`:'<span class="muted small">nav numura</span>'}</div>`}).join('')}</div>`:'<p class="muted">Kontaktu vēl nav. Iepazīsties ar cilvēkiem pilsētā.</p>'}
+      return `<div class="row"><img class="ava sm" src="${portraitURL(p.look,p.sex,null)}" alt=""><div class="nm"><b>${esc(fullName(p))}${p.steady?' ❤':''}</b><span>${esc(p.role||'')} · ${relLabel(p)} · ${DISTS[p.zone]?.n||''}</span><div class="mini2">${bar(p.f/FMAX*100)}${!p.fam&&!p.noRom?bar(p.rom/FMAX*100,'love'):''}</div>${ints?`<div class="tags">${ints}</div>`:''}</div>${p.phone?`<button class="btn" data-call="${p.id}">Zvanīt</button><button class="btn" data-inv="${p.id}">Uzaicināt</button>`:'<span class="muted small">nav numura</span>'}</div>`}).join('')}</div>`:'<p class="muted">Kontaktu vēl nav. Iepazīsties ar cilvēkiem pilsētā.</p>'}
   if(t==='msgs'){body=S.msgs.length?`<div class="rows">${S.msgs.map(m=>{const p=pById(m.from);if(m.day===S.day)m.read=true;const d=m.date?DATES.find(x=>x.id===m.date):null;
     return `<div class="row msg"><div class="nm"><b>${p?esc(p.first):'Ziņa'}</b><span>${m.day}. diena</span><p>${esc(m.text)}</p></div>${(m.type==='invite'||m.type==='date')&&m.day===S.day&&!m.done?`<button class="btn" data-acc="${m.id}">Piekrist</button>`:''}${m.type==='chat'&&!m.done&&p?`<button class="btn" data-rep="${m.id}">Atbildēt</button>`:''}</div>`}).join('')}</div>`:'<p class="muted">Ziņu nav.</p>'}
   if(t==='quests'){const ob=objectives(),q=S.quests.filter(x=>!x.done);
@@ -116,8 +116,8 @@ function mapInfo(b,st){const c=C(),pt=b?b.door:[st.x,st.y],pp=curPos(),dist=Math
   const res=b&&RES.includes(b.type),go=()=>{if(S.where)leaveBuilding();S.tab='city';refreshUI()};
   modal({t:b?b.n:'Metro: '+st.n,sub:b?(res?(HOMES[c.home].b===b.id?'Tavas mājas':'Dzīvojamā ēka'):`${DISTS[b.dist].n} · ${isOpen(b)?'Atvērts':'Slēgts'} · ${hstr(b.hours[0])}–${hstr(b.hours[1])}`):DISTS[st.d].n,ch:[
     {l:'Iet turp',s:`~${Math.round(dist*.6)} min kājām`,fn:()=>{go();goTo(pt[0],pt[1],b?{type:'door',id:b.id}:null)}},
-    {l:'Dzeltenais taksometrs',s:`${usd(fare)} · ${Math.round(6+dist*.2)} min`,dis:c.money<fare,fn:()=>{c.money-=fare;advance(Math.round(6+dist*.2));go();travelTo(pt[0],pt[1]);toast(`Taksometrs aizved tevi līdz: ${b?b.n:st.n}`)}},
-    {l:'Metro',s:`$3 · 12 min · stacija „${near.n}”`,dis:c.money<3,fn:()=>{c.money-=3;advance(12);go();travelTo(near.x,near.y);if(b)goTo(pt[0],pt[1],{type:'door',id:b.id});toast(`Metro: ${near.n}`)}},
+    {l:'Dzeltenais taksometrs',s:`${usd(fare)} · ${Math.round(6+dist*.2)} min`,dis:c.money<fare,fn:()=>{c.money-=fare;advance(Math.round(6+dist*.2));go();travelTo(pt[0],pt[1],'taxi',b?b.n:st.n);toast(`Taksometrs aizved tevi līdz: ${b?b.n:st.n}`)}},
+    {l:'Metro',s:`$3 · 12 min · stacija „${near.n}”`,dis:c.money<3,fn:()=>{c.money-=3;advance(12);go();travelTo(near.x,near.y,'metro',near.n);if(b)goTo(pt[0],pt[1],{type:'door',id:b.id});toast(`Metro: ${near.n}`)}},
     {l:'Aizvērt',exit:true}]})}
 
 /* ---------- Es ---------- */
@@ -165,7 +165,7 @@ window.addEventListener('resize',()=>{resizeCanvas();if(S&&S.tab==='phone'&&S.ph
 /* ---------- Sākums ---------- */
 function startScreen(){
   MQ.length=0;NPCS=[];EXTRAS=[];S=null;
-  let sex=rnd()<.5?'m':'f',first=pick(sex==='m'?LV_M:LV_F),shirt=COLORS[0],skin=SKIN[0],hair=sex==='f'?'long':'short',hairC=HAIRC[3][0];const st={beauty:5,health:5,humor:5,culture:5};
+  let beard=false,sex=rnd()<.5?'m':'f',first=pick(sex==='m'?LV_M:LV_F),shirt=COLORS[0],skin=SKIN[0],hair=sex==='f'?'long':'short',hairC=HAIRC[3][0];const st={beauty:5,health:5,humor:5,culture:5};
   const draw=()=>{const left=20-CORE.reduce((a,k)=>a+st[k],0);
     $('#modalRoot').innerHTML=`<div class="ov start"><div class="sheet">
       <div class="head"><span class="lab">Manhetena · 40 dienas</span><h2 class="logo">Lielais <em>Ābols</em></h2></div>
@@ -175,25 +175,34 @@ function startScreen(){
       <label class="lab" for="fn">Vārds</label><input type="text" id="fn" value="${esc(first)}" maxlength="16">
       <div><div class="lab">Āda</div><div class="sw" id="swS">${SKIN.map(c=>`<button data-v="${c}" style="background:${c}" aria-label="Ādas tonis" aria-pressed="${c===skin}"></button>`).join('')}</div></div>
       <div><div class="lab">Frizūra</div><div class="seg wrap">${HAIRS.filter(h=>h.id!=='bald').map(h=>`<button data-h="${h.id}" aria-pressed="${h.id===hair}">${h.n}</button>`).join('')}</div></div>
+      ${sex==='m'?`<div class="seg" role="group" aria-label="Bārda"><button id="bdN" aria-pressed="${!beard}">Bez bārdas</button><button id="bdY" aria-pressed="${beard}">Ar bārdu</button></div>`:''}
       <div><div class="lab">Matu krāsa</div><div class="sw" id="swH">${HAIRC.map(([c])=>`<button data-v="${c}" style="background:${c}" aria-label="Matu krāsa" aria-pressed="${c===hairC}"></button>`).join('')}</div></div>
       <div><div class="lab">Krekla krāsa</div><div class="sw" id="swT">${COLORS.map(c=>`<button data-v="${c}" style="background:${c}" aria-label="Krāsa" aria-pressed="${c===shirt}"></button>`).join('')}</div></div>
       <div class="pts"><div class="lab">Sadali 20 punktus · atlikuši <b style="color:var(--gold)">${left}</b></div>${CORE.map(k=>`<div class="pt"><span>${STN[k]}</span><button data-m="${k}" aria-label="Mazāk: ${STN[k]}" ${st[k]<=0?'disabled':''}>−</button><b>${st[k]}</b><button data-p="${k}" aria-label="Vairāk: ${STN[k]}" ${left<=0?'disabled':''}>+</button></div>`).join('')}</div>
       <div class="ch"><button id="go" class="go"><b>Izkāpt no metro</b><span>Ņujorka gaida</span></button></div></div></div>`;
     const sv=()=>first=$('#fn').value;
-    $('#sm').onclick=()=>{sv();sex='m';first=pick(LV_M);hair='short';draw()};$('#sf').onclick=()=>{sv();sex='f';first=pick(LV_F);hair='long';draw()};
+    $('#sm').onclick=()=>{sv();sex='m';first=pick(LV_M);hair='short';draw()};$('#sf').onclick=()=>{sv();sex='f';first=pick(LV_F);hair='long';beard=false;draw()};
     $('#swS').querySelectorAll('button').forEach(b=>b.onclick=()=>{sv();skin=b.dataset.v;draw()});$('#swH').querySelectorAll('button').forEach(b=>b.onclick=()=>{sv();hairC=b.dataset.v;draw()});$('#swT').querySelectorAll('button').forEach(b=>b.onclick=()=>{sv();shirt=b.dataset.v;draw()});
-    document.querySelectorAll('[data-h]').forEach(b=>b.onclick=()=>{sv();hair=b.dataset.h;draw()});
+    document.querySelectorAll('[data-h]').forEach(b=>b.onclick=()=>{sv();hair=b.dataset.h;draw()});if($('#bdY')){$('#bdY').onclick=()=>{sv();beard=true;draw()};$('#bdN').onclick=()=>{sv();beard=false;draw()}}
     document.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{sv();if(20-CORE.reduce((a,k)=>a+st[k],0)>0)st[b.dataset.p]++;draw()});
     document.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{sv();if(st[b.dataset.m]>0)st[b.dataset.m]--;draw()});
     const pc=$('#prev').getContext('2d');pc.setTransform(2.4,0,0,2.4,80,150);
-    previewPerson(pc,{skin,hair,hairC,top:{t:sex==='f'?'tank':'tee',c:shirt},bot:{t:sex==='f'?'skirt':'jeans',c:sex==='f'?'#2c3150':'#1f3d6b'},shoe:'#f4f4f4',acc:null},sex);
+    previewPerson(pc,{skin,hair,hairC,beard:sex==='m'&&beard,top:{t:sex==='f'?'tank':'tee',c:shirt},bot:{t:sex==='f'?'skirt':'jeans',c:sex==='f'?'#2c3150':'#1f3d6b'},shoe:'#f4f4f4',acc:null},sex);
     $('#go').onclick=()=>{const n=($('#fn').value||first).trim().slice(0,16)||first;$('#modalRoot').innerHTML='';
-      newGame({first:n,sex,shirt,skin,hair,hairC,st:Object.assign({},st)});S.tab='city';
+      newGame({first:n,sex,shirt,skin,hair,hairC,beard:sex==='m'&&beard,st:Object.assign({},st)});S.tab='city';
       const s0=STATIONS.find(s=>s.d==='gv'),t0=adjFree(CITY,s0.x,s0.y)||[s0.x,s0.y];P.x=t0[0]+.5;P.y=t0[1]+.5;S.where=null;ROOM=null;S.lastDist='gv';initCars();spawnCity();cam.init=false;refreshUI();save();
       modal({t:'Laipni lūgts Ņujorkā!',b:`<p>Pieskaries zemei, lai ietu. Pieskaries ēkai, lai ieietu, vai cilvēkam, lai runātu. Iekštelpās pieskaries priekšmetiem — letēm, galdiem, gultai.</p><p>Vispirms dodies uz <b>Blīkera ielu 14</b> (sarkanā zīme „Mājas”), kur tevi gaida brālis. Telefonā ir kontakti, ziņas, uzdevumi un Manhetenas karte ar metro.</p><p class="muted">Pulkstenis iet pats. Ēd 🍎, guli zZ, ej dušā 🚿 un uz tualetes WC!</p>`,ch:[{l:'Sākt'}]})};
   };
   draw();
 }
+const PORT={};
+function portraitURL(L,sex,expr){const key=JSON.stringify(L)+sex+(expr||'');if(PORT[key])return PORT[key];
+  const c=document.createElement('canvas');c.width=c.height=192;const g=c.getContext('2d');
+  const gr=g.createRadialGradient(96,70,10,96,96,96);gr.addColorStop(0,'#3b3170');gr.addColorStop(1,'#1d1838');g.fillStyle=gr;g.fillRect(0,0,192,192);
+  g.setTransform(3.9,0,0,3.9,96,236);const old=ctx,ot=TIME;ctx=g;TIME=0;try{drawPerson(0,0,Object.assign({},L,{dirty:false}),sex,0,false,1,{noShadow:1,expr})}finally{ctx=old;TIME=ot}
+  const keys=Object.keys(PORT);if(keys.length>220)delete PORT[keys[0]];return PORT[key]=c.toDataURL('image/png')}
+function showTransit(kind,label){const el=$('#transit');if(!el)return;el.className='transit '+kind;el.innerHTML=kind==='metro'?`<div class="tun"></div><div class="train"><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="tlab"><b>M</b>${esc(label||'')}</div>`:`<div class="sky"></div><div class="road"></div><div class="cab"><span>TAXI</span></div><div class="tlab">🚕 ${esc(label||'')}</div>`;
+  el.hidden=false;clearTimeout(el._t);el._t=setTimeout(()=>{el.hidden=true;el.innerHTML=''},1500)}
 function previewPerson(pc,L,sex){const old=ctx;ctx=pc;try{drawPerson(0,0,L,sex,0,false,1,{})}finally{ctx=old}}
 
 function boot(){
